@@ -1,6 +1,7 @@
 *.o
 .vscode
 lexer.cpp
+lexer.hpp
 parser.cpp
 parser.hpp
 main
