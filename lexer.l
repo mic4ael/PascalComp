@@ -1,40 +1,156 @@
+%option nounput
+%option yylineno
+
 %{
 
-#include <math.h>
+#include <iostream>
+#include <math>
+#include "parser.hpp"
 
-int lineno = 1;
+using namesapce std;
 
 %}
 
+NEWLINE "\n"
+TAB "\t"
+SPACE " "
 LETTER [a-zA-Z]
 DIGIT [0-9]
-ID LETTER (LETTER | DIGIT)*
-DIGITS DIGIT DIGIT*
-OPTIONAL_FRACTION . DIGITS?
-OPTIONAL_EXPONENT (E (+ | -)? DIGITS)?
-NUM DIGITS OPTIONAL_FRACTION OPTIONAL_EXPONENT
-ASSIGNOP :=
-OROP or
-NEWLINE \n
-TAB \t
-SPACE " "
+INTEGER {DIGIT}+
+REAL {DIGIT}*"."{DIGIT}+([eE][-+]?{DIGIT}+)?
+ID {LETTER}({LETTER}|{DIGIT})*
 
 %%
 
 {SPACE} |
-{TAB} /* ignore */
+{TAB} |
+{NEWLINE} /* ignore */;
 
-{NEWLINE} lineno++;
+"program" return PROGRAM;
+"var" return VAR;
+"array" return ARRAY;
+"of" return OF;
 
+"integer" {
+    return INTEGER;
+}
 
-<<EOF>> return DONE;
+"real" {
+    return REAL;
+}
+
+"function" {
+    return FUNCTION;
+}
+
+"procedure" {
+    return PROCEDURE;
+}
+
+"begin" {
+    return BEGIN;
+}
+
+"end" {
+    return END;
+}
+
+"if" {
+    return IF;
+}
+
+"then" {
+    return THEN;
+}
+
+"else" {
+    return ELSE;
+}
+
+"while" {
+    return WHILE;
+}
+
+"do" {
+    return DO;
+}
+
+"div" {
+    return DIV;
+}
+
+"mod" {
+    return MOD;
+}
+
+"and" {
+    return AND;
+}
+
+"or" {
+    return OR;
+}
+
+"not" {
+    return NOT;
+}
+
+".." {
+    return DOTDOT;
+}
+
+"+" {
+    return PLUS;
+}
+
+"-" {
+    return MINUS;
+}
+
+"/" {
+    return DIVISION;
+}
+
+"*" {
+    return MULTIPLY;
+}
+
+"=" {
+    return EQUAL;
+}
+
+"<>" {
+    return NOT_EQUAL;
+}
+
+"<" {
+    return LESS;
+}
+
+">" {
+    return GREATER;
+}
+
+">=" {
+    return EORGREATER;
+}
+
+"<=" {
+    return EORLESS;
+}
+
+":=" {
+    return ASSIGN;
+}
+
+{ID} {
+    return ID;
+}
+
+<<EOF>> return 0;
 
 . {
-
+    cout << "Mamy problem. Wykryto niepoprawny znak: " << yytext << endl;
 }
 
 %%
-
-=, <>, <, <=, >=, and >.
-+ or -.
-*, /, div, mod, and and.
