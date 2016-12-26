@@ -6,7 +6,7 @@ main: $(OBJECTS)
 	$(CC) $(OBJECTS) -ll -o main
 
 lexer.cpp:
-	flex --c++ -o lexer.cpp lexer.l
+	flex -o lexer.cpp lexer.l
 
 parser.cpp parser.hpp: parser.ypp
 	bison -d -o parser.cpp parser.ypp
