@@ -27,10 +27,25 @@ ID {LETTER}({LETTER}|{DIGIT})*
 {NEWLINE} |
 "{"[^{]*"}" /* ignore */;
 
-"program" return PROGRAM;
-"var" return VAR;
-"array" return ARRAY;
-"of" return OF;
+[\(\):;,\.\[\]] {
+    return yytext[0];
+}
+
+"program" {
+    return PROGRAM;
+};
+
+"var" {
+    return VAR;
+};
+
+"array" {
+    return ARRAY;
+}
+
+"of" {
+    return OF;
+}
 
 "integer" {
     return INTEGER;
@@ -53,7 +68,7 @@ ID {LETTER}({LETTER}|{DIGIT})*
 }
 
 "end" {
-    return END;
+    return END_TOKEN;
 }
 
 "if" {
@@ -141,7 +156,16 @@ ID {LETTER}({LETTER}|{DIGIT})*
 }
 
 ":=" {
+    
     return ASSIGN;
+}
+
+{INTEGER} {
+    return INTEGER;
+}
+
+{REAL} {
+    return REAL;
 }
 
 {ID} {
