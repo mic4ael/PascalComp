@@ -1,1 +1,5 @@
 *.o
+.vscode
+lexer.cpp
+parser.cpp
+parser.hpp
