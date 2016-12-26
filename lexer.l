@@ -1,13 +1,13 @@
 %option nounput
 %option yylineno
+%option noyywrap
 
 %{
 
 #include <iostream>
-#include <math>
 #include "parser.hpp"
 
-using namesapce std;
+using namespace std;
 
 %}
 
@@ -24,7 +24,8 @@ ID {LETTER}({LETTER}|{DIGIT})*
 
 {SPACE} |
 {TAB} |
-{NEWLINE} /* ignore */;
+{NEWLINE} |
+"{"[^{]*"}" /* ignore */;
 
 "program" return PROGRAM;
 "var" return VAR;
@@ -48,7 +49,7 @@ ID {LETTER}({LETTER}|{DIGIT})*
 }
 
 "begin" {
-    return BEGIN;
+    return BEGIN_TOKEN;
 }
 
 "end" {
@@ -112,7 +113,7 @@ ID {LETTER}({LETTER}|{DIGIT})*
 }
 
 "*" {
-    return MULTIPLY;
+    return MULTIPLICATION;
 }
 
 "=" {
