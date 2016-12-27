@@ -1,6 +1,6 @@
 CC=g++
 CCFLAGS=-Wall
-OBJECTS=parser.o lexer.o main.o
+OBJECTS=parser.o lexer.o main.o symboltable.o codegenerator.o symbol.o
 
 main: $(OBJECTS)
 	$(CC) $(OBJECTS) -ll -o main
@@ -15,7 +15,7 @@ parser.cpp parser.hpp: parser.ypp lexer.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	-rm -f *.o lexer.cpp parser.cpp parser.hpp
+	-rm -f *.o lexer.cpp parser.cpp parser.hpp tests/*.asm
 
 .PHONY:
 	clean
