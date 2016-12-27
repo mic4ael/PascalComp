@@ -6,8 +6,12 @@
 
 #include <iostream>
 #include "parser.hpp"
+#include "symboltable.hpp"
+#include "symbol.hpp"
 
 using namespace std;
+
+extern SymbolTable *symbolTable;
 
 %}
 
@@ -16,8 +20,8 @@ TAB "\t"
 SPACE " "
 LETTER [a-zA-Z]
 DIGIT [0-9]
-INTEGER {DIGIT}+
-REAL {DIGIT}*"."{DIGIT}+([eE][-+]?{DIGIT}+)?
+INTEGER -?{DIGIT}+
+REAL {DIGIT}*'.'{DIGIT}+([eE][-+]?{DIGIT}+)?
 ID {LETTER}({LETTER}|{DIGIT})*
 
 %%
@@ -27,148 +31,74 @@ ID {LETTER}({LETTER}|{DIGIT})*
 {NEWLINE} |
 "{"[^{]*"}" /* ignore */;
 
-[\(\):;,\.\[\]] {
-    return yytext[0];
-}
+[\(\):;,\.\[\]] return yytext[0];
 
-"program" {
-    return PROGRAM;
-};
-
-"var" {
-    return VAR;
-};
-
-"array" {
-    return ARRAY;
-}
-
-"of" {
-    return OF;
-}
-
-"integer" {
-    return INTEGER;
-}
-
-"real" {
-    return REAL;
-}
-
-"function" {
-    return FUNCTION;
-}
-
-"procedure" {
-    return PROCEDURE;
-}
-
-"begin" {
-    return BEGIN_TOKEN;
-}
-
-"end" {
-    return END_TOKEN;
-}
-
-"if" {
-    return IF;
-}
-
-"then" {
-    return THEN;
-}
-
-"else" {
-    return ELSE;
-}
-
-"while" {
-    return WHILE;
-}
-
-"do" {
-    return DO;
-}
-
-"div" {
-    return DIV;
-}
-
-"mod" {
-    return MOD;
-}
-
-"and" {
-    return AND;
-}
-
-"or" {
-    return OR;
-}
-
-"not" {
-    return NOT;
-}
-
-".." {
-    return DOTDOT;
-}
-
-"+" {
-    return PLUS;
-}
-
-"-" {
-    return MINUS;
-}
-
-"/" {
-    return DIVISION;
-}
-
-"*" {
-    return MULTIPLICATION;
-}
-
-"=" {
-    return EQUAL;
-}
-
-"<>" {
-    return NOT_EQUAL;
-}
-
-"<" {
-    return LESS;
-}
-
-">" {
-    return GREATER;
-}
-
-">=" {
-    return EORGREATER;
-}
-
-"<=" {
-    return EORLESS;
-}
-
-":=" {
-    
-    return ASSIGN;
-}
+"program" return PROGRAM;
+"var" return VAR;
+"array" return ARRAY;
+"of" return OF;
+"integer" return INTEGER_TYPE_TOKEN;
+"real" return REAL_TYPE_TOKEN;
+"function" return FUNCTION;
+"procedure" return PROCEDURE;
+"begin" return BEGIN_TOKEN;
+"end" return END_TOKEN;
+"if" return IF;
+"then" return THEN;
+"else" return ELSE;
+"while" return WHILE;
+"do" return DO;
+"div" return DIV;
+"mod" return MOD;
+"and" return AND;
+"or" return OR;
+"not" return NOT;
+".." return DOTDOT;
+"+" return PLUS;
+"-" return MINUS;
+"/" return DIVISION;
+"*" return MULTIPLICATION;
+"=" return EQUAL;
+"<>" return NOT_EQUAL;
+"<" return LESS;
+">" return GREATER;
+">=" return EORGREATER;
+"<=" return EORLESS;
+":=" return ASSIGN;
 
 {INTEGER} {
+    int symbolIndex = symbolTable->lookupSymbol(atoi(yytext));
+    if (symbolIndex == -1)
+    {
+        yylval = symbolTable->insertConstant(atoi(yytext));
+    } else {
+        yylval = symbolIndex;
+    }
+
     return INTEGER;
 }
 
 {REAL} {
+    int symbolIndex = symbolTable->lookupSymbol(atof(yytext));
+    if (symbolIndex == -1)
+    {
+        yylval = symbolTable->insertConstant(atof(yytext));
+    } else {
+        yylval = symbolIndex;
+    }
+
     return REAL;
 }
 
 {ID} {
+    int symbolIndex = symbolTable->lookupSymbol(yytext);
+    if (symbolIndex == -1)
+    {
+        yylval = symbolTable->insertSymbol(yytext);
+    } else {
+        yylval = symbolIndex;
+    }
+
     return ID;
 }
 
