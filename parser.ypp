@@ -3,12 +3,22 @@
 %{
 
 #include <iostream>
+#include <vector>
 #include "lexer.hpp"
+#include "codegenerator.hpp"
+#include "symboltable.hpp"
+#include "symbol.hpp"
 
 using namespace std;
 
 int yylex();
 void yyerror(const char *s);
+
+extern CodeGenerator *codeGenerator;
+extern SymbolTable *symbolTable;
+
+std::vector<int> pendingSymbols;
+std::vector<int> arguments;
 
 %}
 
@@ -16,7 +26,9 @@ void yyerror(const char *s);
 %token VAR
 %token ARRAY
 %token OF
+%token INTEGER_TYPE_TOKEN
 %token INTEGER
+%token REAL_TYPE_TOKEN
 %token REAL
 %token FUNCTION
 %token PROCEDURE
@@ -46,69 +58,111 @@ void yyerror(const char *s);
 %token ASSIGN
 %token ID
 
+%left PLUS MINUS
+%left MULTIPLICATION DIVISION
+
 %%
 
 program:
-    PROGRAM ID '(' identifier_list ')' ';'
+    PROGRAM program_id '(' identifier_list ')' ';' {
+        for (int i = 0; i < pendingSymbols.size(); ++i) {
+            Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
+            symbol.setSymbolType(VAR_SYMBOL);
+            symbol.setVarType(NONE_TYPE);
+        }
+
+        pendingSymbols.clear();
+    }
     declarations
     subprogram_declarations
-    compound_statement '.'
+    compound_statement '.' {
+        codeGenerator->generateExitStatement();
+    }
+    ;
+
+program_id:
+    ID {
+        Symbol &programSymbol = symbolTable->getSymbolByIndex($1);
+        programSymbol.setSymbolType(LABEL_SYMBOL);
+        codeGenerator->generateJumpStatement(programSymbol.getSymbolName());
+        codeGenerator->generateLabelStatement(programSymbol.getSymbolName());
+    }
     ;
 
 identifier_list:
-    ID {}
-    | identifier_list ',' ID {}
+    ID {
+        pendingSymbols.push_back($1);
+    }
+    | identifier_list ',' ID {
+        pendingSymbols.push_back($3);
+    }
     ;
 
 declarations:
-    declarations VAR identifier_list ':' type ';' {}
+    declarations VAR identifier_list ':' type ';' {
+        for (int i = 0; i < pendingSymbols.size(); ++i) {
+            Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
+            symbol.setSymbolType(VAR_SYMBOL);
+            switch ($5) {
+                case INTEGER_TYPE_TOKEN:
+                    symbol.setVarType(INT_TYPE);
+                    symbol.setAddress(symbolTable->getAddress());
+                    symbolTable->increaseAddress(4);
+                    break;
+                case REAL_TYPE_TOKEN:
+                    symbol.setVarType(REAL_TYPE);
+                    symbol.setAddress(symbolTable->getAddress());
+                    symbolTable->increaseAddress(8);
+                    break;
+            }
+        }
+        pendingSymbols.clear();
+    }
     | /* empty */
     ;
 
-type: 
-    standard_type {}
-    | ARRAY '[' INTEGER DOTDOT INTEGER ']' OF standard_type {
-
-    }
+type:
+    standard_type
+    | ARRAY '[' INTEGER DOTDOT INTEGER ']' OF standard_type
     ;
 
 standard_type:
-    INTEGER {}
-    | REAL {}
+    INTEGER_TYPE_TOKEN {
+        $$ = INTEGER_TYPE_TOKEN;
+    }
+    | REAL_TYPE_TOKEN {
+        $$ = REAL_TYPE_TOKEN;
+    }
     ;
 
 subprogram_declarations:
-    subprogram_declarations subprogram_declaration ';' {}
-    |
+    subprogram_declarations subprogram_declaration ';'
+    | /* ignore */
     ;
 
 subprogram_declaration:
-    subprogram_head declarations compound_statement {
-
-    }
+    subprogram_head declarations compound_statement
     ;
 
 subprogram_head:
     FUNCTION ID arguments ':' standard_type ';' {
-
+        Symbol &symbol = symbolTable->getSymbolByIndex($2);
+        symbol.setSymbolType(FUNCTION_SYMBOL);
     }
     | PROCEDURE ID arguments ';' {
-        
+        Symbol &symbol = symbolTable->getSymbolByIndex($2);
+        symbol.setSymbolType(PROCEDURE_SYMBOL);
     }
     ;
 
 arguments:
-    '(' parameter_list ')' {}
+    '(' parameter_list ')'
     | /* empty */
     ;
 
 parameter_list:
-    identifier_list ':' type {
-
-    }
-    | parameter_list ';' identifier_list ':' type {
-
-    }
+    identifier_list ':' type
+    | parameter_list ';' identifier_list ':' type
     ;
 
 compound_statement:
@@ -119,13 +173,29 @@ compound_statement:
 
 statement_list:
     statement
-    | statement_list ';' statement {
-
-    }
+    | statement_list ';' statement
     ;
 
 statement: 
-    variable ASSIGN expression
+    variable ASSIGN expression {
+        Symbol src = symbolTable->getSymbolByIndex($1);
+        Symbol dst = symbolTable->getSymbolByIndex($3);
+
+        if (src.getVarType() == REAL_TYPE && dst.getVarType() == INT_TYPE) {
+            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+            Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+            codeGenerator->generateIntToRealStatement(dst, tmpSymbol);
+            codeGenerator->generateMovStatement(src, tmpSymbol, REAL_TYPE);
+        } else if (dst.getVarType() == REAL_TYPE && src.getVarType() == INT_TYPE) {
+            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+            Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+            codeGenerator->generateIntToRealStatement(src, tmpSymbol);
+            codeGenerator->generateMovStatement(tmpSymbol, src, REAL_TYPE);
+        } else {
+            VarType varType = src.getVarType();
+            codeGenerator->generateMovStatement(src, dst, varType);
+        }
+    }
     | procedure_statement
     | compound_statement
     | IF expression THEN statement ELSE statement
@@ -135,35 +205,78 @@ statement:
 
 variable:
     ID
-    | ID '[' expression ']' {
+    | ID '[' expression ']'
+    ;
 
+procedure_statement:
+    ID
+    | ID '(' expression_list ')' {
+        Symbol &procedureSymbol = symbolTable->getSymbolByIndex($1);
+        for (int i = 0; i < arguments.size(); i++)
+        {
+            if (procedureSymbol.getSymbolName().compare("write") == 0) {
+                Symbol &argSymbol = symbolTable->getSymbolByIndex(arguments[i]);
+                codeGenerator->generateWriteStatement(argSymbol);
+            }
+        }
+
+        arguments.clear();
     }
     ;
 
-procedure_statement: 
-    ID
-    | ID '(' expression_list ')'
-    ;
-
 expression_list:
-    expression
-    | expression_list ',' expression
+    expression {
+        arguments.push_back($1);
+    }
+    | expression_list ',' expression {
+        arguments.push_back($3);
+    }
     ;
 
 expression:
     simple_expression
-    | simple_expression EQUAL simple_expression {}
-    | simple_expression NOT_EQUAL simple_expression {}
-    | simple_expression GREATER simple_expression {}
-    | simple_expression LESS simple_expression {}
+    | simple_expression EQUAL simple_expression
+    | simple_expression NOT_EQUAL simple_expression
+    | simple_expression GREATER simple_expression
+    | simple_expression LESS simple_expression
+    | simple_expression PLUS simple_expression {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+        int tmpIndex = -1;
+        Symbol tmpSymbol;
+        Symbol dst;
+
+        if (left.getVarType() == REAL_TYPE && right.getVarType() == INT_TYPE) {
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
+            codeGenerator->generateIntToRealStatement(right, tmpSymbol);
+            right = tmpSymbol;
+            $$ = symbolTable->createTemporaryVariable(REAL_TYPE);
+            dst = symbolTable->getSymbolByIndex($$);
+        } else if (right.getVarType() == REAL_TYPE && left.getVarType() == INT_TYPE) {
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
+            codeGenerator->generateIntToRealStatement(left, tmpSymbol);
+            left = tmpSymbol;
+            $$ = symbolTable->createTemporaryVariable(REAL_TYPE);
+            dst = symbolTable->getSymbolByIndex($$);
+        } else {
+            tmpIndex = symbolTable->createTemporaryVariable(left.getVarType());
+            dst = symbolTable->getSymbolByIndex(tmpIndex);
+            $$ = tmpIndex;
+        }
+
+        codeGenerator->generateArithmeticStatement(left, right, dst, '+');
+    }
+    | simple_expression MINUS simple_expression {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+    }
     ;
 
 simple_expression:
     term
     | sign term
-    | simple_expression sign term {
-
-    }
     | simple_expression OR term {
 
     }
@@ -174,7 +287,32 @@ simple_expression:
 
 term: 
     factor
-    | term MULTIPLICATION factor
+    | term MULTIPLICATION factor {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+        int tmpIndex = -1;
+        Symbol tmpSymbol;
+
+        if (left.getVarType() == REAL_TYPE && right.getVarType() == INT_TYPE) {
+            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+            codeGenerator->generateIntToRealStatement(right, tmpSymbol);
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            right = tmpSymbol;
+        } else if (right.getVarType() == REAL_TYPE && left.getVarType() == INT_TYPE) {
+            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+            codeGenerator->generateIntToRealStatement(left, tmpSymbol);
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            left = tmpSymbol;
+        } else {
+            tmpIndex = symbolTable->createTemporaryVariable(INT_TYPE);
+        }
+
+        Symbol dst = symbolTable->getSymbolByIndex(tmpIndex);
+        codeGenerator->generateArithmeticStatement(left, right, dst, '*');
+        $$ = tmpIndex;
+    }
     | term DIVISION factor
     | term DIV factor
     | term MOD factor
@@ -183,29 +321,20 @@ term:
 factor:
     variable
     | ID '(' expression_list ')'
-    | INTEGER {
-
-    }
-    | REAL {
-
-    }
-    | '(' expression ')' {
-
-    }
+    | INTEGER
+    | REAL
+    | '(' expression ')'
     | NOT factor
     ;
 
 sign:
-    PLUS {
-
-    }
-    | MINUS {
-
-    }
+    PLUS
+    | MINUS
     ;
 %%
 
 void yyerror(const char *err)
 {
     cout << "Błąd składniowy w linii " << yylineno << ". " << err << endl;
+    exit(-1);
 }
