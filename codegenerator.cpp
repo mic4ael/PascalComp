@@ -76,4 +76,20 @@ void CodeGenerator::generateIntToRealStatement(Symbol src, Symbol dst)
          << endl;
 }
 
+void CodeGenerator::generateProcedureEnterStatement(int numberOfArguments)
+{
+    cout << "\tenter.i #" << 4 * numberOfArguments << endl;
+}
+
+void CodeGenerator::generateSubProgramReturnStatements()
+{
+    cout << "\tleave" << endl
+         << "\treturn" << endl;
+}
+
+void CodeGenerator::generateCallStatement(string procedureName)
+{
+    cout << "\tcall.i #" << procedureName << endl;
+}
+
 CodeGenerator *codeGenerator = new CodeGenerator();

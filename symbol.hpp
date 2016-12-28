@@ -24,7 +24,7 @@ enum SymbolType
     LABEL_SYMBOL,
     VAR_SYMBOL,
     CONSTANT_SYMBOL,
-    NONE
+    NONE_SYMBOL
 };
 
 class Symbol
@@ -37,13 +37,13 @@ public:
     {
         this->address = 0;
         this->type = NONE_TYPE;
-        this->symbolType = NONE;
+        this->symbolType = NONE_SYMBOL;
     };
     Symbol(std::string symbolName, VarType varType) :symbolName(symbolName), type(varType)
     {
         this->address = 0;
         this->type = NONE_TYPE;
-        this->symbolType = NONE;
+        this->symbolType = NONE_SYMBOL;
     };
 
     ~Symbol();

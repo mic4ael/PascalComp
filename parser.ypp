@@ -19,6 +19,8 @@ extern SymbolTable *symbolTable;
 
 std::vector<int> pendingSymbols;
 std::vector<int> arguments;
+int programSymbolIndex = -1;
+SymbolTable *tmp;
 
 %}
 
@@ -67,7 +69,7 @@ program:
     PROGRAM program_id '(' identifier_list ')' ';' {
         for (int i = 0; i < pendingSymbols.size(); ++i) {
             Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
-            symbol.setSymbolType(VAR_SYMBOL);
+            symbol.setSymbolType(NONE_SYMBOL);
             symbol.setVarType(NONE_TYPE);
         }
 
@@ -75,17 +77,27 @@ program:
     }
     declarations
     subprogram_declarations
-    compound_statement '.' {
+    program_compound_statement
+    ;
+
+program_compound_statement:
+    BEGIN_TOKEN {
+        Symbol &programSymbol = symbolTable->getSymbolByIndex(programSymbolIndex);
+        codeGenerator->generateLabelStatement(programSymbol.getSymbolName());
+    }
+    statement_list
+    END_TOKEN '.' {
+        Symbol &programSymbol = symbolTable->getSymbolByIndex(programSymbolIndex);
         codeGenerator->generateExitStatement();
     }
     ;
 
 program_id:
     ID {
+        programSymbolIndex = $1;
         Symbol &programSymbol = symbolTable->getSymbolByIndex($1);
         programSymbol.setSymbolType(LABEL_SYMBOL);
         codeGenerator->generateJumpStatement(programSymbol.getSymbolName());
-        codeGenerator->generateLabelStatement(programSymbol.getSymbolName());
     }
     ;
 
@@ -136,7 +148,11 @@ standard_type:
     ;
 
 subprogram_declarations:
-    subprogram_declarations subprogram_declaration ';'
+    subprogram_declarations subprogram_declaration ';' {
+        codeGenerator->generateSubProgramReturnStatements();
+        symbolTable = tmp;
+        tmp = NULL;
+    }
     | /* ignore */
     ;
 
@@ -148,10 +164,19 @@ subprogram_head:
     FUNCTION ID arguments ':' standard_type ';' {
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
         symbol.setSymbolType(FUNCTION_SYMBOL);
+        codeGenerator->generateLabelStatement(symbol.getSymbolName());
+        codeGenerator->generateProcedureEnterStatement(pendingSymbols.size());
+        pendingSymbols.clear();
     }
     | PROCEDURE ID arguments ';' {
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
         symbol.setSymbolType(PROCEDURE_SYMBOL);
+        tmp = symbolTable;
+        symbolTable = symbolTable->addNewSymbolTable(symbol.getSymbolName());
+        codeGenerator->generateLabelStatement(symbol.getSymbolName());
+        codeGenerator->generateProcedureEnterStatement(pendingSymbols.size());
+        symbolTable->insertConstant((int) pendingSymbols.size() * 4);
+        pendingSymbols.clear();
     }
     ;
 
@@ -161,8 +186,12 @@ arguments:
     ;
 
 parameter_list:
-    identifier_list ':' type
-    | parameter_list ';' identifier_list ':' type
+    identifier_list ':' type {
+        cout << pendingSymbols.size() << endl;
+    }
+    | parameter_list ';' identifier_list ':' type {
+        cout << pendingSymbols.size() << endl;
+    }
     ;
 
 compound_statement:
@@ -209,15 +238,20 @@ variable:
     ;
 
 procedure_statement:
-    ID
+    ID {
+        Symbol &procedureSymbol = symbolTable->getSymbolByIndex($1);
+        codeGenerator->generateCallStatement(procedureSymbol.getSymbolName());
+    }
     | ID '(' expression_list ')' {
         Symbol &procedureSymbol = symbolTable->getSymbolByIndex($1);
-        for (int i = 0; i < arguments.size(); i++)
-        {
-            if (procedureSymbol.getSymbolName().compare("write") == 0) {
+        if (procedureSymbol.getSymbolName().compare("write") == 0) {
+            for (int i = 0; i < arguments.size(); i++)
+            {
                 Symbol &argSymbol = symbolTable->getSymbolByIndex(arguments[i]);
                 codeGenerator->generateWriteStatement(argSymbol);
             }
+        } else {
+            codeGenerator->generateCallStatement(procedureSymbol.getSymbolName());
         }
 
         arguments.clear();
@@ -323,7 +357,9 @@ factor:
     | ID '(' expression_list ')'
     | INTEGER
     | REAL
-    | '(' expression ')'
+    | '(' expression ')' {
+        $$ = $2;
+    }
     | NOT factor
     ;
 

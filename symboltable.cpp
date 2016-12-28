@@ -11,17 +11,17 @@ SymbolTable::SymbolTable()
     this->address = 0;
     this->temporaryVariableCount = 0;
 
-    Symbol writeProc("write");
-    writeProc.setSymbolType(PROCEDURE_SYMBOL);
-    this->symbols.push_back(writeProc);
-
     Symbol readProc("read");
     readProc.setSymbolType(PROCEDURE_SYMBOL);
     this->symbols.push_back(readProc);
 
-    Symbol exitProc("exit");
-    exitProc.setSymbolType(PROCEDURE_SYMBOL);
-    this->symbols.push_back(exitProc);
+    Symbol writeProc("write");
+    writeProc.setSymbolType(PROCEDURE_SYMBOL);
+    this->symbols.push_back(writeProc);
+
+    // Symbol exitProc("exit");
+    // exitProc.setSymbolType(PROCEDURE_SYMBOL);
+    // this->symbols.push_back(exitProc);
 }
 
 Symbol& SymbolTable::getSymbolByIndex(int tokenIndex)
@@ -133,45 +133,67 @@ int SymbolTable::insertConstant(double doubleValue)
 
 string SymbolTable::tableStr() {
     ostringstream out;
-    out << "\nSymbol Table Dump" << endl;
 
-    for (int i = 0; i < this->symbols.size(); ++i)
+    for (int j = 0; j < this->children.size(); ++j)
     {
-        Symbol symbol = this->symbols[i];
-        out << "; " << i << " Global ";
+        out << this->printTable(this->children[j]);
+    }
 
-        switch (symbol.getSymbolType()) {
-            case PROCEDURE_SYMBOL:
-                out << "procedure " << symbol.getSymbolName() << endl;
-                break;
-            case FUNCTION_SYMBOL:
-                out << "function " << symbol.getSymbolName() << endl;
-                break;
-            case LABEL_SYMBOL:
-                out << "label " << symbol.getSymbolName() << endl;
-                break;
-            case VAR_SYMBOL:
-                out << "variable " << symbol.getSymbolName();
-                switch (symbol.getVarType()) {
-                    case INT_TYPE:
-                        out << " integer offset=" << symbol.getAddress() << endl;
-                        address += 4;
-                        break;
-                    case REAL_TYPE:
-                        out << " real offset=" << symbol.getAddress() << endl;
-                        address += 8;
-                        break;
-                    case NONE_TYPE:
-                        out << endl;
-                        break;
-                    }
+    out << this->printTable(this);
+    return out.str();
+}
+
+string SymbolTable::printTable(SymbolTable *table)
+{
+    ostringstream out;
+    vector<Symbol> symbols = table->symbols;
+    out << "\nSymbol Table Dump" << endl;
+    int index = 0;
+    for (int i = 0; i < symbols.size(); ++i)
+    {
+        Symbol symbol = symbols[i];
+
+        switch (symbol.getSymbolType())
+        {
+        case PROCEDURE_SYMBOL:
+            out << "; " << index++ << " Global procedure " << symbol.getSymbolName() << endl;
+            break;
+        case FUNCTION_SYMBOL:
+            out << "; " << index++ << " Global function " << symbol.getSymbolName() << endl;
+            break;
+        case LABEL_SYMBOL:
+            out << "; " << index++ << " Global label " << symbol.getSymbolName() << endl;
+            break;
+        case VAR_SYMBOL:
+            out << "; " << index++ << " Global variable " << symbol.getSymbolName();
+            switch (symbol.getVarType()) {
+                case INT_TYPE:
+                    out << " integer offset=" << symbol.getAddress() << endl;
+                    address += 4;
                     break;
-            case CONSTANT_SYMBOL:
-                out << "constant " << symbol.getSymbolName() << endl;
+                case REAL_TYPE:
+                    out << " real offset=" << symbol.getAddress() << endl;
+                    address += 8;
+                    break;
+                case NONE_TYPE:
+                    out << endl;
+                    break;
+                }
                 break;
-            default:
-                out << "NONE " << symbol.getSymbolName() << endl;
-                break;
+        case CONSTANT_SYMBOL:
+            out << "; " << index++ << " Local number ";
+            if (symbol.getVarType() == INT_TYPE)
+            {
+                out << symbol.getSymbolValue().intValue
+                    << " integer" << endl;
+            } else {
+                out << symbol.getSymbolValue().doubleValue
+                    << " real" << endl;
+            }
+
+            break;
+        default:
+            break;
         }
     }
 
@@ -186,6 +208,16 @@ void SymbolTable::increaseAddress(int increaseBy)
 int SymbolTable::getAddress()
 {
     return this->address;
+}
+
+SymbolTable *SymbolTable::addNewSymbolTable(string name)
+{
+    SymbolTable *newTable = new SymbolTable();
+    newTable->symbols = vector<Symbol>(this->symbols);
+    newTable->parent = this;
+    newTable->name = name;
+    this->children.push_back(newTable);
+    return newTable;
 }
 
 SymbolTable *symbolTable = new SymbolTable();

@@ -23,6 +23,9 @@ public:
     void generateReadStatement();
     void generateArithmeticStatement(Symbol left, Symbol right, Symbol dst, char op);
     void generateIntToRealStatement(Symbol src, Symbol dst);
+    void generateProcedureEnterStatement(int numberOfArguments);
+    void generateSubProgramReturnStatements();
+    void generateCallStatement(string procedureName);
 };
 
 #endif

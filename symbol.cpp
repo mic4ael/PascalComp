@@ -4,7 +4,7 @@ Symbol::Symbol()
 {
     this->address = 0;
     this->type = NONE_TYPE;
-    this->symbolType = NONE;
+    this->symbolType = NONE_SYMBOL;
 }
 
 Symbol::Symbol(int value)
