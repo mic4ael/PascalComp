@@ -276,20 +276,10 @@ Symbol* SymbolTable::lookupFuncReturnReference(string funcName)
     return NULL;
 }
 
-Symbol SymbolTable::lookupReturnVariable(string funcName)
+Symbol SymbolTable::lookupReturnVariable(Symbol funcSymbol)
 {
-    int tmpVarIndex = -1;
-    for (int i = 0; i < this->children->size(); ++i)
-    {
-        SymbolTable *table = this->children->at(i);
-        if (table->getName().compare(funcName) == 0)
-        {
-            Symbol *s = table->lookupFuncReturnReference(funcName);
-            tmpVarIndex = s->getReferences();
-        }
-    }
-
-    return *this->symbols->at(tmpVarIndex);
+    int refId = this->createTemporaryVariable(funcSymbol.getReturnType());
+    return *this->symbols->at(refId);
 }
 
 int SymbolTable::createReference(string name, VarType type)

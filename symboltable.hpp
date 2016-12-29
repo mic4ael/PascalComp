@@ -40,7 +40,7 @@ public:
         return this->name;
     }
     Symbol* lookupFuncReturnReference(string funcName);
-    Symbol lookupReturnVariable(string funcName);
+    Symbol lookupReturnVariable(Symbol funcSymbol);
     int createReference(string name, VarType type);
 };
 

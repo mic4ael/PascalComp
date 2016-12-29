@@ -170,21 +170,27 @@ subprogram_head:
         tmp = symbolTable;
         symbolTable = symbolTable->addNewSymbolTable(symbol.getSymbolName());
     } arguments ':' standard_type ';' {
-        Symbol &symbol = symbolTable->getSymbolByIndex($2);
-        symbol.setReturnType($6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
-        int tmpValue = symbolTable->createReference(symbol.getSymbolName(), $6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
-        Symbol &tmpS = symbolTable->getSymbolByIndex(tmpValue);
-        int refId = tmp->createTemporaryVariable($6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
-        tmpS.setReferences(refId);
-        codeGenerator->generateLabelStatement(symbol.getSymbolName());
+        Symbol &fSymbol = symbolTable->getSymbolByIndex($2);
+        fSymbol.setReturnType($6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+        int tmpValue = symbolTable->createReference(fSymbol.getSymbolName(), $6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+        for (int i = 0; i < pendingSymbols.size(); ++i) {
+            Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
+            symbol.setVarType($6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+            symbol.setSymbolType(VAR_SYMBOL);
+            symbol.setIsReference(true);
+            symbol.setAddress(symbolTable->getAddress());
+            symbolTable->increaseAddress(symbol.getVarType() == INT_TYPE ? 4 : 8);
+        }
+        codeGenerator->generateLabelStatement(fSymbol.getSymbolName());
         codeGenerator->generateProcedureEnterStatement(pendingSymbols.size());
     }
-    | PROCEDURE ID arguments ';' {
-        symbolTable->insertConstant((int) pendingSymbols.size() * 4);
+    | PROCEDURE ID {
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
         symbol.setSymbolType(PROCEDURE_SYMBOL);
         tmp = symbolTable;
         symbolTable = symbolTable->addNewSymbolTable(symbol.getSymbolName());
+    } arguments ';' {
+        Symbol &symbol = symbolTable->getSymbolByIndex($2);
         codeGenerator->generateLabelStatement(symbol.getSymbolName());
         codeGenerator->generateProcedureEnterStatement(pendingSymbols.size());
     }
@@ -196,26 +202,8 @@ arguments:
     ;
 
 parameter_list:
-    identifier_list ':' type {
-        for (int i = 0; i < pendingSymbols.size(); ++i) {
-            Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
-            symbol.setVarType($3 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
-            symbol.setSymbolType(VAR_SYMBOL);
-            symbol.setIsReference(true);
-            symbol.setAddress(symbolTable->getAddress());
-            symbolTable->increaseAddress(symbol.getVarType() == INT_TYPE ? 4 : 8);
-        }
-    }
-    | parameter_list ';' identifier_list ':' type {
-        for (int i = 0; i < pendingSymbols.size(); ++i) {
-            Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
-            symbol.setVarType($5 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
-            symbol.setSymbolType(VAR_SYMBOL);
-            symbol.setIsReference(true);
-            symbol.setAddress(symbolTable->getAddress());
-            symbolTable->increaseAddress(symbol.getVarType() == INT_TYPE ? 4 : 8);
-        }
-    }
+    identifier_list ':' type
+    | parameter_list ';' identifier_list ':' type
     ;
 
 compound_statement:
@@ -235,7 +223,7 @@ statement:
         Symbol dst = symbolTable->getSymbolByIndex($3);
 
         if (dst.getSymbolType() == FUNCTION_SYMBOL) {
-            Symbol returnVar = symbolTable->lookupReturnVariable(dst.getSymbolName());
+            Symbol returnVar = symbolTable->lookupReturnVariable(dst);
             codeGenerator->generatePushStatement(returnVar);
             codeGenerator->generateCallStatement(dst.getSymbolName());
             codeGenerator->generateIncSPStatement(1);
