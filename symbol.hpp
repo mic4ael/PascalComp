@@ -111,7 +111,46 @@ public:
         return this->references;
     }
 
+    bool isLocalVar()
+    {
+        return this->isLocal;
+    }
+
+    void setIsLocal(bool isLocal)
+    {
+        this->isLocal = isLocal;
+    }
+
+    std::string getASMOperand()
+    {
+        if (this->isReference)
+        {
+            return "*BP+" + std::to_string(this->address);
+        } else if (this->isLocalVar()) {
+            std::string ret = "BP";
+            if (this->address > 0)
+            {
+                ret += "+";
+            }
+            return ret + std::to_string(this->address);
+        } else if (this->symbolType == CONSTANT_SYMBOL) {
+            if (this->type == INT_TYPE)
+            {
+                return "#" + std::to_string(this->value.intValue);
+            }
+            else
+            {
+                return "#" + std::to_string(this->value.doubleValue);
+            }
+        }
+        else
+        {
+            return std::to_string(this->address);;
+        }
+    }
+
 private:
+    bool isLocal;
     std::string symbolName;
     SymbolValue value;
     VarType type;

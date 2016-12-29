@@ -36,6 +36,14 @@ void CodeGenerator::generateMovStatement(Symbol src, Symbol dst, VarType varType
         if (dst.isSymbolReference())
         {
             this->outputFile << "*BP+" << dst.getAddress();
+        } else if (dst.isLocalVar()) {
+            this->outputFile << "BP";
+            if (dst.getAddress() > 0)
+            {
+                this->outputFile << "+";
+            }
+
+            this->outputFile << dst.getAddress();
         }
         else
         {
@@ -46,6 +54,16 @@ void CodeGenerator::generateMovStatement(Symbol src, Symbol dst, VarType varType
     if (src.isSymbolReference())
     {
         this->outputFile << "," << "*BP+" << src.getAddress();
+    }
+    else if (src.isLocalVar()) 
+    {
+        this->outputFile << "BP";
+        if (dst.getAddress() > 0)
+        {
+            this->outputFile << "+";
+        }
+
+        this->outputFile << dst.getAddress();
     }
     else
     {
@@ -91,8 +109,8 @@ void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbo
     switch (op)
     {
     case '+':
-        this->outputFile << "\tadd." << operationType << " " << left.getAddress() << ","
-             << right.getAddress() << "," << dst.getAddress()
+        this->outputFile << "\tadd." << operationType << " " << left.getASMOperand() << ","
+             << right.getASMOperand() << "," << dst.getASMOperand()
              << "\t;add." << operationType << " " << left.getSymbolName() << ","
              << right.getSymbolName() << "," << dst.getSymbolName()
              << endl;
@@ -101,6 +119,12 @@ void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbo
         this->outputFile << "\tmul." << operationType << " " << left.getAddress() << ","
              << right.getAddress() << "," << dst.getAddress()
              << "\t;mul.i " << left.getSymbolName() << "," << right.getSymbolName() << "," << dst.getSymbolName()
+             << endl;
+        break;
+    case '-':
+        this->outputFile << "\tsub." << operationType << " " << left.getAddress() << ","
+             << right.getAddress() << "," << dst.getAddress()
+             << "\t;sub.i " << left.getSymbolName() << "," << right.getSymbolName() << "," << dst.getSymbolName()
              << endl;
         break;
     }

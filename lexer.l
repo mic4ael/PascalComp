@@ -67,24 +67,10 @@ ID {LETTER}({LETTER}|{DIGIT})*
 ":=" return ASSIGN;
 
 {INTEGER} {
-    int symbolIndex = symbolTable->lookupSymbol(atoi(yytext));
-    if (symbolIndex == -1)
-    {
-        yylval = symbolTable->insertConstant(atoi(yytext));
-    } else {
-        yylval = symbolIndex;
-    }
     return INTEGER;
 }
 
 {REAL} {
-    int symbolIndex = symbolTable->lookupSymbol(atof(yytext));
-    if (symbolIndex == -1)
-    {
-        yylval = symbolTable->insertConstant(atof(yytext));
-    } else {
-        yylval = symbolIndex;
-    }
     return REAL;
 }
 

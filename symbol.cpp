@@ -31,6 +31,18 @@ Symbol::Symbol(double value)
 
 std::string Symbol::getSymbolName()
 {
+    if (this->symbolType == CONSTANT_SYMBOL)
+    {
+        if (this->type == INT_TYPE)
+        {
+            return std::to_string(this->value.intValue);
+        }
+        else
+        {
+            return std::to_string(this->value.doubleValue);
+        }
+    }
+
     return this->symbolName;
 }
 

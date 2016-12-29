@@ -41,6 +41,7 @@ public:
     }
     Symbol* lookupFuncReturnReference(string funcName);
     Symbol lookupReturnVariable(string funcName);
+    int createReference(string name, VarType type);
 };
 
 #endif

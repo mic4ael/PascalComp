@@ -101,8 +101,18 @@ int SymbolTable::createTemporaryVariable(VarType varType)
     Symbol *s = new Symbol(tmp);
     s->setVarType(varType);
     s->setSymbolType(VAR_SYMBOL);
-    s->setAddress(this->address);
-    this->address += varType == INT_TYPE ? 4 : 8;
+    if (this->name.compare("global") != 0)
+    {
+        s->setIsLocal(true);
+        s->setAddress(this->localSpaceAddress);
+        this->localSpaceAddress -= varType == INT_TYPE ? 4 : 8;
+    }
+    else
+    {
+        s->setAddress(this->address);
+        this->address += varType == INT_TYPE ? 4 : 8;
+    }
+
     this->temporaryVariableCount += 1;
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
@@ -179,12 +189,18 @@ string SymbolTable::printTable(SymbolTable *table)
 
             if (symbol->isSymbolReference())
             {
-                Symbol s = table->getSymbolByIndex(symbol->getReferences());
-                out << " Local reference variable " << s.getSymbolName();
+                out << " Local reference variable " << symbol->getSymbolName();
             }
             else
             {
-                out << " Global variable " << symbol->getSymbolName();
+                if (symbol->isLocalVar())
+                {
+                    out << " Local variable " << symbol->getSymbolName();
+                }
+                else
+                {
+                    out << " Global variable " << symbol->getSymbolName();
+                }
             }
             switch (symbol->getVarType()) {
                 case INT_TYPE:
@@ -204,10 +220,10 @@ string SymbolTable::printTable(SymbolTable *table)
             out << "; " << index++ << " Local number ";
             if (symbol->getVarType() == INT_TYPE)
             {
-                out << symbol->getSymbolValue().intValue
+                out << symbol->getSymbolName()
                     << " integer" << endl;
             } else {
-                out << symbol->getSymbolValue().doubleValue
+                out << symbol->getSymbolName()
                     << " real" << endl;
             }
 
@@ -234,7 +250,8 @@ SymbolTable *SymbolTable::addNewSymbolTable(string name)
 {
     SymbolTable *newTable = new SymbolTable;
     newTable->address = 8;
-    newTable->symbols = new vector<Symbol*>;
+    newTable->localSpaceAddress = -4;
+    newTable->symbols = new vector<Symbol *>;
     newTable->parent = this;
     newTable->name = name;
 
@@ -273,6 +290,18 @@ Symbol SymbolTable::lookupReturnVariable(string funcName)
     }
 
     return *this->symbols->at(tmpVarIndex);
+}
+
+int SymbolTable::createReference(string name, VarType type)
+{
+    Symbol *s = new Symbol(name);
+    s->setVarType(type);
+    s->setSymbolType(VAR_SYMBOL);
+    s->setIsReference(true);
+    s->setAddress(this->address);
+    this->address += (type == INT_TYPE ? 4 : 8);
+    this->symbols->push_back(s);
+    return this->symbols->size() - 1;
 }
 
 SymbolTable *symbolTable = new SymbolTable();

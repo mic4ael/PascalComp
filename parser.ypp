@@ -19,6 +19,7 @@ extern SymbolTable *symbolTable;
 
 std::vector<int> pendingSymbols;
 std::vector<int> arguments;
+std::vector<int> functionDeclaredArguments;
 int programSymbolIndex = -1;
 SymbolTable *tmp;
 
@@ -149,6 +150,8 @@ standard_type:
 
 subprogram_declarations:
     subprogram_declarations subprogram_declaration ';' {
+        symbolTable->insertConstant((int) pendingSymbols.size() * 4);
+        pendingSymbols.clear();
         codeGenerator->generateSubProgramReturnStatements();
         symbolTable = tmp;
         tmp = NULL;
@@ -161,33 +164,29 @@ subprogram_declaration:
     ;
 
 subprogram_head:
-    FUNCTION ID arguments ':' standard_type ';' {
+    FUNCTION ID {
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
         symbol.setSymbolType(FUNCTION_SYMBOL);
-        symbol.setReturnType($5 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
         tmp = symbolTable;
         symbolTable = symbolTable->addNewSymbolTable(symbol.getSymbolName());
-        int tmpValue = symbolTable->createTemporaryVariable($5 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+    } arguments ':' standard_type ';' {
+        Symbol &symbol = symbolTable->getSymbolByIndex($2);
+        symbol.setReturnType($6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+        int tmpValue = symbolTable->createReference(symbol.getSymbolName(), $6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
         Symbol &tmpS = symbolTable->getSymbolByIndex(tmpValue);
-        tmpS.setIsReference(true);
-        tmpS.setSymbolName(symbol.getSymbolName());
-        int refId = tmp->createTemporaryVariable($5 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+        int refId = tmp->createTemporaryVariable($6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
         tmpS.setReferences(refId);
-        Symbol &funcRetSymbol = tmp->getSymbolByIndex(refId);
-        codeGenerator->generateLabelStatement(funcRetSymbol.getSymbolName());
+        codeGenerator->generateLabelStatement(symbol.getSymbolName());
         codeGenerator->generateProcedureEnterStatement(pendingSymbols.size());
-        symbolTable->insertConstant((int) pendingSymbols.size() * 4);
-        pendingSymbols.clear();
     }
     | PROCEDURE ID arguments ';' {
+        symbolTable->insertConstant((int) pendingSymbols.size() * 4);
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
         symbol.setSymbolType(PROCEDURE_SYMBOL);
         tmp = symbolTable;
         symbolTable = symbolTable->addNewSymbolTable(symbol.getSymbolName());
         codeGenerator->generateLabelStatement(symbol.getSymbolName());
         codeGenerator->generateProcedureEnterStatement(pendingSymbols.size());
-        symbolTable->insertConstant((int) pendingSymbols.size() * 4);
-        pendingSymbols.clear();
     }
     ;
 
@@ -197,8 +196,26 @@ arguments:
     ;
 
 parameter_list:
-    identifier_list ':' type
-    | parameter_list ';' identifier_list ':' type
+    identifier_list ':' type {
+        for (int i = 0; i < pendingSymbols.size(); ++i) {
+            Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
+            symbol.setVarType($3 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+            symbol.setSymbolType(VAR_SYMBOL);
+            symbol.setIsReference(true);
+            symbol.setAddress(symbolTable->getAddress());
+            symbolTable->increaseAddress(symbol.getVarType() == INT_TYPE ? 4 : 8);
+        }
+    }
+    | parameter_list ';' identifier_list ':' type {
+        for (int i = 0; i < pendingSymbols.size(); ++i) {
+            Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
+            symbol.setVarType($5 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+            symbol.setSymbolType(VAR_SYMBOL);
+            symbol.setIsReference(true);
+            symbol.setAddress(symbolTable->getAddress());
+            symbolTable->increaseAddress(symbol.getVarType() == INT_TYPE ? 4 : 8);
+        }
+    }
     ;
 
 compound_statement:
@@ -324,6 +341,31 @@ expression:
     | simple_expression MINUS simple_expression {
         Symbol left = symbolTable->getSymbolByIndex($1);
         Symbol right = symbolTable->getSymbolByIndex($3);
+        int tmpIndex = -1;
+        Symbol tmpSymbol;
+        Symbol dst;
+
+        if (left.getVarType() == REAL_TYPE && right.getVarType() == INT_TYPE) {
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
+            codeGenerator->generateIntToRealStatement(right, tmpSymbol);
+            right = tmpSymbol;
+            $$ = symbolTable->createTemporaryVariable(REAL_TYPE);
+            dst = symbolTable->getSymbolByIndex($$);
+        } else if (right.getVarType() == REAL_TYPE && left.getVarType() == INT_TYPE) {
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
+            codeGenerator->generateIntToRealStatement(left, tmpSymbol);
+            left = tmpSymbol;
+            $$ = symbolTable->createTemporaryVariable(REAL_TYPE);
+            dst = symbolTable->getSymbolByIndex($$);
+        } else {
+            tmpIndex = symbolTable->createTemporaryVariable(left.getVarType());
+            dst = symbolTable->getSymbolByIndex(tmpIndex);
+            $$ = tmpIndex;
+        }
+
+        codeGenerator->generateArithmeticStatement(left, right, dst, '-');
     }
     ;
 
@@ -370,8 +412,24 @@ term:
 factor:
     variable
     | ID '(' expression_list ')'
-    | INTEGER
-    | REAL
+    | INTEGER {
+        int symbolIndex = symbolTable->lookupSymbol(atoi(yytext));
+        if (symbolIndex == -1)
+        {
+            $$ = symbolTable->insertConstant(atoi(yytext));
+        } else {
+            $$ = symbolIndex;
+        }
+    }
+    | REAL {
+        int symbolIndex = symbolTable->lookupSymbol(atof(yytext));
+        if (symbolIndex == -1)
+        {
+            $$ = symbolTable->insertConstant(atof(yytext));
+        } else {
+            $$ = symbolIndex;
+        }
+    }
     | '(' expression ')' {
         $$ = $2;
     }
