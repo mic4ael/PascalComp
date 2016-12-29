@@ -25,7 +25,8 @@ enum SymbolType
     LABEL_SYMBOL,
     VAR_SYMBOL,
     CONSTANT_SYMBOL,
-    NONE_SYMBOL
+    NONE_SYMBOL,
+    ARGUMENT_SYMBOL
 };
 
 class Symbol

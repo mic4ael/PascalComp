@@ -13,13 +13,14 @@ private:
     string name;
     int address;
     SymbolTable *parent;
-    int temporaryVariableCount;
     string printTable(SymbolTable *table);
 
 public:
+    int temporaryVariableCount;
     vector<Symbol*> *symbols;
     vector<SymbolTable*> *children;
     int localSpaceAddress;
+    int lastLocalSpaceAddress;
     SymbolTable();
     ~SymbolTable();
     int lookupSymbol(const char *symbol);

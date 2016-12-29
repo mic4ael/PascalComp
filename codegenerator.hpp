@@ -14,6 +14,7 @@ class CodeGenerator
 {
 private:
     ofstream outputFile;
+    int numberOfPushes;
 
 public:
     CodeGenerator();
@@ -28,11 +29,16 @@ public:
     void generateReadStatement();
     void generateArithmeticStatement(Symbol left, Symbol right, Symbol dst, char op);
     void generateIntToRealStatement(Symbol src, Symbol dst);
+    void generateRealToIntStatement(Symbol src, Symbol dst);
     void generateProcedureEnterStatement(int numberOfArguments);
     void generateSubProgramReturnStatements();
     void generateCallStatement(string procedureName);
     void generatePushStatement(Symbol symbol);
-    void generateIncSPStatement(int numberOfPushes);
+    void generateIncSPStatement();
+    int getNumberOfPushes()
+    {
+        return this->numberOfPushes;
+    }
 };
 
 #endif

@@ -21,7 +21,7 @@ SPACE " "
 LETTER [a-zA-Z]
 DIGIT [0-9]
 INTEGER -?{DIGIT}+
-REAL {DIGIT}*'.'{DIGIT}+([eE][-+]?{DIGIT}+)?
+REAL {DIGIT}*\.{DIGIT}+([eE][-+]?{DIGIT}+)?
 ID {LETTER}({LETTER}|{DIGIT})*
 
 %%

@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <vector>
+#include <map>
 #include "lexer.hpp"
 #include "codegenerator.hpp"
 #include "symboltable.hpp"
@@ -19,9 +20,10 @@ extern SymbolTable *symbolTable;
 
 std::vector<int> pendingSymbols;
 std::vector<int> arguments;
-std::vector<int> functionDeclaredArguments;
+std::map<int, VarType> varToTypesMap;
 int programSymbolIndex = -1;
 SymbolTable *tmp;
+std::vector<Symbol> searchFuncArguments(int funcId);
 
 %}
 
@@ -62,7 +64,7 @@ SymbolTable *tmp;
 %token ID
 
 %left PLUS MINUS
-%left MULTIPLICATION DIVISION
+%left '*' '/'
 
 %%
 
@@ -119,14 +121,19 @@ declarations:
             switch ($5) {
                 case INTEGER_TYPE_TOKEN:
                     symbol.setVarType(INT_TYPE);
-                    symbol.setAddress(symbolTable->getAddress());
-                    symbolTable->increaseAddress(4);
                     break;
                 case REAL_TYPE_TOKEN:
                     symbol.setVarType(REAL_TYPE);
-                    symbol.setAddress(symbolTable->getAddress());
-                    symbolTable->increaseAddress(8);
                     break;
+            }
+            if (symbolTable->getName().compare("global") != 0)
+            {
+                symbol.setIsLocal(true);
+                symbol.setAddress(symbolTable->localSpaceAddress);
+                symbolTable->localSpaceAddress -= symbol.getVarType() == INT_TYPE ? 4 : 8;
+            } else {
+                symbol.setAddress(symbolTable->getAddress());
+                symbolTable->increaseAddress(symbol.getVarType() == INT_TYPE ? 4 : 8);
             }
         }
         pendingSymbols.clear();
@@ -150,8 +157,16 @@ standard_type:
 
 subprogram_declarations:
     subprogram_declarations subprogram_declaration ';' {
-        symbolTable->insertConstant((int) pendingSymbols.size() * 4);
-        pendingSymbols.clear();
+        if (symbolTable->lastLocalSpaceAddress == -4)
+        {
+            symbolTable->insertConstant(0);
+        }
+        else
+        {
+            symbolTable->insertConstant(symbolTable->temporaryVariableCount * 4);
+        }
+
+        varToTypesMap.clear();
         codeGenerator->generateSubProgramReturnStatements();
         symbolTable = tmp;
         tmp = NULL;
@@ -173,16 +188,17 @@ subprogram_head:
         Symbol &fSymbol = symbolTable->getSymbolByIndex($2);
         fSymbol.setReturnType($6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
         int tmpValue = symbolTable->createReference(fSymbol.getSymbolName(), $6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
-        for (int i = 0; i < pendingSymbols.size(); ++i) {
-            Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
-            symbol.setVarType($6 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
-            symbol.setSymbolType(VAR_SYMBOL);
+        std::map<int, VarType>::reverse_iterator iter;
+        for (iter = varToTypesMap.rbegin(); iter != varToTypesMap.rend(); ++iter) {
+            Symbol &symbol = symbolTable->getSymbolByIndex(iter->first);
+            symbol.setVarType(iter->second);
+            symbol.setSymbolType(ARGUMENT_SYMBOL);
             symbol.setIsReference(true);
             symbol.setAddress(symbolTable->getAddress());
-            symbolTable->increaseAddress(symbol.getVarType() == INT_TYPE ? 4 : 8);
+            symbolTable->increaseAddress(4);
         }
         codeGenerator->generateLabelStatement(fSymbol.getSymbolName());
-        codeGenerator->generateProcedureEnterStatement(pendingSymbols.size());
+        codeGenerator->generateProcedureEnterStatement(symbolTable->temporaryVariableCount);
     }
     | PROCEDURE ID {
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
@@ -192,7 +208,7 @@ subprogram_head:
     } arguments ';' {
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
         codeGenerator->generateLabelStatement(symbol.getSymbolName());
-        codeGenerator->generateProcedureEnterStatement(pendingSymbols.size());
+        codeGenerator->generateProcedureEnterStatement(symbolTable->temporaryVariableCount);
     }
     ;
 
@@ -202,8 +218,36 @@ arguments:
     ;
 
 parameter_list:
-    identifier_list ':' type
-    | parameter_list ';' identifier_list ':' type
+    identifier_list ':' type {
+        for (int i = 0; i < pendingSymbols.size(); ++i)
+        {
+            if ($3 == INTEGER_TYPE_TOKEN)
+            {
+                varToTypesMap[pendingSymbols[i]] = INT_TYPE;
+            }
+            else
+            {
+                varToTypesMap[pendingSymbols[i]] = REAL_TYPE;
+            }
+            
+        }
+        pendingSymbols.clear();
+    }
+    | parameter_list ';' identifier_list ':' type {
+        for (int i = 0; i < pendingSymbols.size(); ++i)
+        {
+            if ($5 == INTEGER_TYPE_TOKEN)
+            {
+                varToTypesMap[pendingSymbols[i]] = INT_TYPE;
+            }
+            else
+            {
+                varToTypesMap[pendingSymbols[i]] = REAL_TYPE;
+            }
+            
+        }
+        pendingSymbols.clear();
+    }
     ;
 
 compound_statement:
@@ -226,8 +270,7 @@ statement:
             Symbol returnVar = symbolTable->lookupReturnVariable(dst);
             codeGenerator->generatePushStatement(returnVar);
             codeGenerator->generateCallStatement(dst.getSymbolName());
-            codeGenerator->generateIncSPStatement(1);
-            symbolTable->insertConstant(4);
+            codeGenerator->generateIncSPStatement();
             symbolTable->localSpaceAddress -= 4;
             codeGenerator->generateMovStatement(src, returnVar, src.getVarType());
         } else if (src.getSymbolType() == FUNCTION_SYMBOL) {
@@ -293,13 +336,14 @@ expression_list:
 
 expression:
     simple_expression
-    | simple_expression EQUAL simple_expression
-    | simple_expression NOT_EQUAL simple_expression
-    | simple_expression GREATER simple_expression
-    | simple_expression LESS simple_expression
-    | simple_expression PLUS simple_expression {
+    | simple_expression EQUAL expression
+    | simple_expression NOT_EQUAL expression
+    | simple_expression GREATER expression
+    | simple_expression LESS expression
+    | simple_expression PLUS expression {
         Symbol left = symbolTable->getSymbolByIndex($1);
         Symbol right = symbolTable->getSymbolByIndex($3);
+
         int tmpIndex = -1;
         Symbol tmpSymbol;
         Symbol dst;
@@ -326,7 +370,7 @@ expression:
 
         codeGenerator->generateArithmeticStatement(left, right, dst, '+');
     }
-    | simple_expression MINUS simple_expression {
+    | simple_expression MINUS expression {
         Symbol left = symbolTable->getSymbolByIndex($1);
         Symbol right = symbolTable->getSymbolByIndex($3);
         int tmpIndex = -1;
@@ -399,7 +443,48 @@ term:
 
 factor:
     variable
-    | ID '(' expression_list ')'
+    | ID '(' expression_list ')' {
+        std::vector<Symbol> funcArgs = searchFuncArguments($1);
+        for (int i = 0; i < arguments.size(); ++i)
+        {
+            Symbol s = symbolTable->getSymbolByIndex(arguments[i]);
+            if (s.getSymbolType() == CONSTANT_SYMBOL)
+            {
+                int tmpIndex = symbolTable->createTemporaryVariable(s.getVarType());
+                Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
+                codeGenerator->generateMovStatement(tmpSymbol, s, s.getVarType());
+                codeGenerator->generatePushStatement(tmpSymbol);
+            }
+            else if (s.getVarType() != funcArgs[i].getVarType())
+            {
+                if (s.getVarType() == INT_TYPE)
+                {
+                    int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+                    Symbol ss = symbolTable->getSymbolByIndex(tmpValue);
+                    codeGenerator->generateIntToRealStatement(s, ss);
+                    codeGenerator->generatePushStatement(ss);
+                }
+                else
+                {
+                    int tmpValue = symbolTable->createTemporaryVariable(INT_TYPE);
+                    Symbol ss = symbolTable->getSymbolByIndex(tmpValue);
+                    codeGenerator->generateRealToIntStatement(s, ss);
+                    codeGenerator->generatePushStatement(ss);
+                }
+            }
+            else
+            {
+                codeGenerator->generatePushStatement(s);
+            }
+        }
+
+        // Symbol dst = symbolTable->getSymbolByIndex($1);
+        // Symbol returnVar = symbolTable->lookupReturnVariable(dst);
+        // codeGenerator->generatePushStatement(returnVar);
+        // codeGenerator->generateCallStatement(dst.getSymbolName());
+        // codeGenerator->generateIncSPStatement();
+        // symbolTable->localSpaceAddress -= 4;
+    }
     | INTEGER {
         int symbolIndex = symbolTable->lookupSymbol(atoi(yytext));
         if (symbolIndex == -1)
@@ -434,4 +519,30 @@ void yyerror(const char *err)
 {
     cout << "Błąd składniowy w linii " << yylineno << ". " << err << endl;
     exit(-1);
+}
+
+std::vector<Symbol> searchFuncArguments(int funcId)
+{
+    std::vector<Symbol> ret;
+    if (symbolTable->getName().compare("global") == 0)
+    {
+        Symbol func = symbolTable->getSymbolByIndex(funcId);
+        for (int i = 0; i < symbolTable->children->size(); ++i)
+        {
+            SymbolTable *table = symbolTable->children->at(i);
+            if (table->getName().compare(func.getSymbolName()) == 0)
+            {
+                for (int j = 0; j < table->symbols->size(); ++j)
+                {
+                    Symbol s = *table->symbols->at(j);
+                    if (s.getSymbolType() == ARGUMENT_SYMBOL)
+                    {
+                        ret.push_back(s);
+                    }
+                }
+            }
+        }
+    }
+
+    return ret;
 }

@@ -13,6 +13,7 @@ SymbolTable::SymbolTable()
     this->address = 0;
     this->name = "global";
     this->localSpaceAddress = 0;
+    this->lastLocalSpaceAddress = 0;
     this->temporaryVariableCount = 0;
 
     Symbol *readProc = new Symbol("read");
@@ -104,7 +105,8 @@ int SymbolTable::createTemporaryVariable(VarType varType)
     if (this->name.compare("global") != 0)
     {
         s->setIsLocal(true);
-        s->setAddress(this->localSpaceAddress);
+        s->setAddress(this->lastLocalSpaceAddress);
+        this->lastLocalSpaceAddress = this->localSpaceAddress;
         this->localSpaceAddress -= varType == INT_TYPE ? 4 : 8;
     }
     else
@@ -120,6 +122,14 @@ int SymbolTable::createTemporaryVariable(VarType varType)
 
 int SymbolTable::insertSymbol(const char *symbol)
 {
+    for (int i = 0; i < this->symbols->size(); ++i)
+    {
+        if (this->symbols->at(i)->getSymbolName().compare(symbol) == 0)
+        {
+            return i;
+        }
+    }
+
     Symbol *s = new Symbol(symbol);
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
@@ -127,6 +137,14 @@ int SymbolTable::insertSymbol(const char *symbol)
 
 int SymbolTable::insertSymbol(const char *symbol, VarType varType)
 {
+    for (int i = 0; i < this->symbols->size(); ++i)
+    {
+        if (this->symbols->at(i)->getSymbolName().compare(symbol) == 0)
+        {
+            return i;
+        }
+    }
+
     Symbol *s = new Symbol(symbol, varType);
     s->setAddress(this->address);
     this->symbols->push_back(s);
@@ -136,16 +154,42 @@ int SymbolTable::insertSymbol(const char *symbol, VarType varType)
 
 int SymbolTable::insertConstant(int intValue)
 {
+    for (int i = 0; i < this->symbols->size(); ++i)
+    {
+        if (this->symbols->at(i)->getSymbolType() == CONSTANT_SYMBOL && this->symbols->at(i)->getSymbolValue().intValue == intValue)
+        {
+            return i;
+        }
+    }
+
     Symbol *s = new Symbol(intValue);
     s->setAddress(this->address);
+    if (this->name.compare("global") != 0)
+    {
+        this->lastLocalSpaceAddress = this->localSpaceAddress;
+        this->localSpaceAddress -= 4;
+    }
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
 }
 
 int SymbolTable::insertConstant(double doubleValue)
 {
+    for (int i = 0; i < this->symbols->size(); ++i)
+    {
+        if (this->symbols->at(i)->getSymbolType() == CONSTANT_SYMBOL && this->symbols->at(i)->getSymbolValue().doubleValue == doubleValue)
+        {
+            return i;
+        }
+    }
+
     Symbol *s = new Symbol(doubleValue);
     s->setAddress(this->address);
+    if (this->name.compare("global") != 0)
+    {
+        this->lastLocalSpaceAddress = this->localSpaceAddress;
+        this->localSpaceAddress -= 8;
+    }
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
 }
@@ -166,7 +210,7 @@ string SymbolTable::printTable(SymbolTable *table)
 {
     ostringstream out;
     vector<Symbol*> *symbols = table->symbols;
-    out << "\nSymbol Table Dump " << table->getName() << endl;
+    out << "Symbol Table Dump " << table->getName() << endl;
     int index = 0;
     for (int i = 0; i < symbols->size(); ++i)
     {
@@ -185,6 +229,7 @@ string SymbolTable::printTable(SymbolTable *table)
             out << "; " << index++ << " Global label " << symbol->getSymbolName() << endl;
             break;
         case VAR_SYMBOL:
+        case ARGUMENT_SYMBOL:
             out << "; " << index++;
 
             if (symbol->isSymbolReference())
@@ -217,7 +262,15 @@ string SymbolTable::printTable(SymbolTable *table)
                 }
                 break;
         case CONSTANT_SYMBOL:
-            out << "; " << index++ << " Local number ";
+            out << "; " << index++;
+            if (table->getName().compare("global") == 0)
+            {
+                out << " Global number ";
+            }
+            else
+            {
+                out << " Local number ";
+            }
             if (symbol->getVarType() == INT_TYPE)
             {
                 out << symbol->getSymbolName()
@@ -289,7 +342,7 @@ int SymbolTable::createReference(string name, VarType type)
     s->setSymbolType(VAR_SYMBOL);
     s->setIsReference(true);
     s->setAddress(this->address);
-    this->address += (type == INT_TYPE ? 4 : 8);
+    this->address += 4;
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
 }

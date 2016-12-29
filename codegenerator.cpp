@@ -1,4 +1,7 @@
 #include "codegenerator.hpp"
+#include "symboltable.hpp"
+
+extern SymbolTable *symbolTable;
 
 CodeGenerator::CodeGenerator()
 {
@@ -28,60 +31,9 @@ void CodeGenerator::generateLabelStatement(string labelName)
 void CodeGenerator::generateMovStatement(Symbol src, Symbol dst, VarType varType)
 {
     char opType = varType == INT_TYPE ? 'i' : 'r';
-    this->outputFile << "\tmov." << opType << " ";
-    if (dst.getSymbolType() == CONSTANT_SYMBOL) {
-        this->outputFile << "#" << dst.getSymbolValue().intValue;
-    } else {
-        this->outputFile << " ";
-        if (dst.isSymbolReference())
-        {
-            this->outputFile << "*BP+" << dst.getAddress();
-        } else if (dst.isLocalVar()) {
-            this->outputFile << "BP";
-            if (dst.getAddress() > 0)
-            {
-                this->outputFile << "+";
-            }
-
-            this->outputFile << dst.getAddress();
-        }
-        else
-        {
-            this->outputFile << dst.getAddress();
-        }
-    }
-
-    if (src.isSymbolReference())
-    {
-        this->outputFile << "," << "*BP+" << src.getAddress();
-    }
-    else if (src.isLocalVar()) 
-    {
-        this->outputFile << "BP";
-        if (dst.getAddress() > 0)
-        {
-            this->outputFile << "+";
-        }
-
-        this->outputFile << dst.getAddress();
-    }
-    else
-    {
-        this->outputFile << "," << src.getAddress();
-    }
-
-    this->outputFile << "\t;mov." << opType << " ";
-
-    if (dst.getSymbolType() == CONSTANT_SYMBOL)
-    {
-        this->outputFile << dst.getSymbolValue().intValue;
-    }
-    else
-    {
-        this->outputFile << dst.getSymbolName();
-    }
-
-    this->outputFile << "," << src.getSymbolName() << endl;
+    this->outputFile << "\tmov." << opType << " " << dst.getASMOperand();
+    this->outputFile << "," << src.getASMOperand();
+    this->outputFile << endl;
 }
 
 void CodeGenerator::generateAssignmentStatement()
@@ -93,9 +45,7 @@ void CodeGenerator::generateWriteStatement(Symbol symbol)
 {
     char opType = symbol.getVarType() == INT_TYPE ? 'i' : 'r';
     this->outputFile << "\twrite." << opType << " "
-         << symbol.getAddress() << " ";
-    this->outputFile << "\t;write." << opType << " "
-         << symbol.getSymbolName() << endl;
+         << symbol.getASMOperand() << " " << endl;
 }
 
 void CodeGenerator::generateReadStatement()
@@ -110,30 +60,28 @@ void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbo
     {
     case '+':
         this->outputFile << "\tadd." << operationType << " " << left.getASMOperand() << ","
-             << right.getASMOperand() << "," << dst.getASMOperand()
-             << "\t;add." << operationType << " " << left.getSymbolName() << ","
-             << right.getSymbolName() << "," << dst.getSymbolName()
-             << endl;
+             << right.getASMOperand() << "," << dst.getASMOperand() << endl;
         break;
     case '*':
         this->outputFile << "\tmul." << operationType << " " << left.getAddress() << ","
-             << right.getAddress() << "," << dst.getAddress()
-             << "\t;mul.i " << left.getSymbolName() << "," << right.getSymbolName() << "," << dst.getSymbolName()
-             << endl;
+                         << right.getAddress() << "," << dst.getAddress() << endl;
         break;
     case '-':
         this->outputFile << "\tsub." << operationType << " " << left.getAddress() << ","
-             << right.getAddress() << "," << dst.getAddress()
-             << "\t;sub.i " << left.getSymbolName() << "," << right.getSymbolName() << "," << dst.getSymbolName()
-             << endl;
+                         << right.getAddress() << "," << dst.getAddress() << endl;
         break;
     }
 }
 
 void CodeGenerator::generateIntToRealStatement(Symbol src, Symbol dst)
 {
-    this->outputFile << "\tinttoreal.i " << src.getAddress() << "," << dst.getAddress()
-         << "\t;inttoreal.i " << src.getSymbolName() << "," << dst.getSymbolName()
+    this->outputFile << "\tinttoreal.i " << src.getASMOperand() << "," << dst.getASMOperand()
+         << endl;
+}
+
+void CodeGenerator::generateRealToIntStatement(Symbol src, Symbol dst)
+{
+    this->outputFile << "\trealtoint.r " << src.getAddress() << "," << dst.getAddress()
          << endl;
 }
 
@@ -150,30 +98,24 @@ void CodeGenerator::generateSubProgramReturnStatements()
 
 void CodeGenerator::generateCallStatement(string procedureName)
 {
-    this->outputFile << "\tcall.i #" << procedureName
-         << "\t; call.i &" << procedureName
-         << endl;
+    this->outputFile << "\tcall.i #" << procedureName << endl;
 }
 
 void CodeGenerator::generatePushStatement(Symbol symbol)
 {
+    this->numberOfPushes += 1;
     this->outputFile << "\tpush.i #" << symbol.getAddress();
-
-    if (symbol.isSymbolReference())
-    {
-        this->outputFile << "\t; push.i &" << symbol.getSymbolName();
-    }
-    else
-    {
-        this->outputFile << "\t; push.i #" << symbol.getSymbolName();
-    }
-
     this->outputFile << endl;
 }
 
-void CodeGenerator::generateIncSPStatement(int numberOfPushes)
+void CodeGenerator::generateIncSPStatement()
 {
-    this->outputFile << "\tincsp.i #" << numberOfPushes * 4 << endl;
+    if (this->numberOfPushes != 0)
+    {
+        symbolTable->insertConstant(this->numberOfPushes * 4);
+        this->outputFile << "\tincsp.i #" << this->numberOfPushes * 4 << endl;
+        this->numberOfPushes = 0;
+    }
 }
 
 CodeGenerator *codeGenerator = new CodeGenerator();
