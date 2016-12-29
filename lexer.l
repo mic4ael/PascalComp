@@ -74,7 +74,6 @@ ID {LETTER}({LETTER}|{DIGIT})*
     } else {
         yylval = symbolIndex;
     }
-
     return INTEGER;
 }
 
@@ -86,7 +85,6 @@ ID {LETTER}({LETTER}|{DIGIT})*
     } else {
         yylval = symbolIndex;
     }
-
     return REAL;
 }
 

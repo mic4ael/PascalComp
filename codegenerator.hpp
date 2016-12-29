@@ -26,6 +26,8 @@ public:
     void generateProcedureEnterStatement(int numberOfArguments);
     void generateSubProgramReturnStatements();
     void generateCallStatement(string procedureName);
+    void generatePushStatement(Symbol symbol);
+    void generateIncSPStatement(int numberOfPushes);
 };
 
 #endif

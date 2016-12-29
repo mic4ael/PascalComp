@@ -8,37 +8,48 @@ using namespace std;
 
 SymbolTable::SymbolTable()
 {
+    this->children = new vector<SymbolTable*>();
+    this->symbols = new vector<Symbol*>();
     this->address = 0;
+    this->name = "global";
+    this->localSpaceAddress = 0;
     this->temporaryVariableCount = 0;
 
-    Symbol readProc("read");
-    readProc.setSymbolType(PROCEDURE_SYMBOL);
-    this->symbols.push_back(readProc);
+    Symbol *readProc = new Symbol("read");
+    readProc->setSymbolType(PROCEDURE_SYMBOL);
+    this->symbols->push_back(readProc);
 
-    Symbol writeProc("write");
-    writeProc.setSymbolType(PROCEDURE_SYMBOL);
-    this->symbols.push_back(writeProc);
+    Symbol *writeProc = new Symbol("write");
+    writeProc->setSymbolType(PROCEDURE_SYMBOL);
+    this->symbols->push_back(writeProc);
 
     // Symbol exitProc("exit");
     // exitProc.setSymbolType(PROCEDURE_SYMBOL);
-    // this->symbols.push_back(exitProc);
+    // this->symbols->push_back(exitProc);
+}
+
+SymbolTable::~SymbolTable()
+{
+    for (int i = 0; i < this->children->size(); ++i) {
+        delete this->children->at(i);
+    }
 }
 
 Symbol& SymbolTable::getSymbolByIndex(int tokenIndex)
 {
-    return this->symbols[tokenIndex];
+    return *this->symbols->at(tokenIndex);
 }
 
 int SymbolTable::lookupSymbol(const char *symbol)
 {
-    if (this->symbols.size() == 0)
+    if (this->symbols->size() == 0)
     {
-        return -1;
+        return -3;
     }
 
-    for (int i = 0; i < this->symbols.size(); ++i)
+    for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols[i].getSymbolName().compare(symbol) == 0)
+        if (this->symbols->at(i)->getSymbolName().compare(symbol) == 0)
         {
             return i;
         }
@@ -49,14 +60,14 @@ int SymbolTable::lookupSymbol(const char *symbol)
 
 int SymbolTable::lookupSymbol(int intValue)
 {
-    if (this->symbols.size() == 0)
+    if (this->symbols->size() == 0)
     {
         return -1;
     }
 
-    for (int i = 0; i < this->symbols.size(); ++i)
+    for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols[i].getSymbolValue().intValue == intValue)
+        if (this->symbols->at(i)->getSymbolValue().intValue == intValue)
         {
             return i;
         }
@@ -67,14 +78,14 @@ int SymbolTable::lookupSymbol(int intValue)
 
 int SymbolTable::lookupSymbol(double doubleValue)
 {
-    if (this->symbols.size() == 0)
+    if (this->symbols->size() == 0)
     {
         return -1;
     }
 
-    for (int i = 0; i < this->symbols.size(); ++i)
+    for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols[i].getSymbolValue().doubleValue == doubleValue)
+        if (this->symbols->at(i)->getSymbolValue().doubleValue == doubleValue)
         {
             return i;
         }
@@ -87,56 +98,54 @@ int SymbolTable::createTemporaryVariable(VarType varType)
 {
     string tmp = "$t";
     tmp += std::to_string(this->temporaryVariableCount);
-    Symbol s(tmp);
-    s.setVarType(varType);
-    s.setSymbolType(VAR_SYMBOL);
-    s.setAddress(this->address);
+    Symbol *s = new Symbol(tmp);
+    s->setVarType(varType);
+    s->setSymbolType(VAR_SYMBOL);
+    s->setAddress(this->address);
     this->address += varType == INT_TYPE ? 4 : 8;
     this->temporaryVariableCount += 1;
-    this->symbols.push_back(s);
-    return this->symbols.size() - 1;
+    this->symbols->push_back(s);
+    return this->symbols->size() - 1;
 }
 
 int SymbolTable::insertSymbol(const char *symbol)
 {
-    Symbol s(symbol);
-    this->symbols.push_back(s);
-    return this->symbols.size() - 1;
+    Symbol *s = new Symbol(symbol);
+    this->symbols->push_back(s);
+    return this->symbols->size() - 1;
 }
 
 int SymbolTable::insertSymbol(const char *symbol, VarType varType)
 {
-    Symbol s(symbol, varType);
-    s.setAddress(this->address);
-    this->symbols.push_back(s);
+    Symbol *s = new Symbol(symbol, varType);
+    s->setAddress(this->address);
+    this->symbols->push_back(s);
     this->address += varType == INT_TYPE ? 4 : 8;
-    return this->symbols.size() - 1;
+    return this->symbols->size() - 1;
 }
 
 int SymbolTable::insertConstant(int intValue)
 {
-    Symbol s(intValue);
-    s.setAddress(this->address);
-    this->symbols.push_back(s);
-    this->address += 4;
-    return this->symbols.size() - 1;
+    Symbol *s = new Symbol(intValue);
+    s->setAddress(this->address);
+    this->symbols->push_back(s);
+    return this->symbols->size() - 1;
 }
 
 int SymbolTable::insertConstant(double doubleValue)
 {
-    Symbol s(doubleValue);
-    s.setAddress(this->address);
-    this->symbols.push_back(s);
-    this->address += 8;
-    return this->symbols.size() - 1;
+    Symbol *s = new Symbol(doubleValue);
+    s->setAddress(this->address);
+    this->symbols->push_back(s);
+    return this->symbols->size() - 1;
 }
 
 string SymbolTable::tableStr() {
     ostringstream out;
 
-    for (int j = 0; j < this->children.size(); ++j)
+    for (int j = 0; j < this->children->size(); ++j)
     {
-        out << this->printTable(this->children[j]);
+        out << this->printTable(this->children->at(j));
     }
 
     out << this->printTable(this);
@@ -146,33 +155,44 @@ string SymbolTable::tableStr() {
 string SymbolTable::printTable(SymbolTable *table)
 {
     ostringstream out;
-    vector<Symbol> symbols = table->symbols;
-    out << "\nSymbol Table Dump" << endl;
+    vector<Symbol*> *symbols = table->symbols;
+    out << "\nSymbol Table Dump " << table->getName() << endl;
     int index = 0;
-    for (int i = 0; i < symbols.size(); ++i)
+    for (int i = 0; i < symbols->size(); ++i)
     {
-        Symbol symbol = symbols[i];
-
-        switch (symbol.getSymbolType())
+        Symbol *symbol = symbols->at(i);
+        switch (symbol->getSymbolType())
         {
         case PROCEDURE_SYMBOL:
-            out << "; " << index++ << " Global procedure " << symbol.getSymbolName() << endl;
+            out << "; " << index++ << " Global procedure " << symbol->getSymbolName() << endl;
             break;
         case FUNCTION_SYMBOL:
-            out << "; " << index++ << " Global function " << symbol.getSymbolName() << endl;
+            out << "; " << index++ << " Global function " << symbol->getSymbolName() 
+                << (symbol->getReturnType() == REAL_TYPE ? " real" : " integer")
+                << endl;
             break;
         case LABEL_SYMBOL:
-            out << "; " << index++ << " Global label " << symbol.getSymbolName() << endl;
+            out << "; " << index++ << " Global label " << symbol->getSymbolName() << endl;
             break;
         case VAR_SYMBOL:
-            out << "; " << index++ << " Global variable " << symbol.getSymbolName();
-            switch (symbol.getVarType()) {
+            out << "; " << index++;
+
+            if (symbol->isSymbolReference())
+            {
+                Symbol s = table->getSymbolByIndex(symbol->getReferences());
+                out << " Local reference variable " << s.getSymbolName();
+            }
+            else
+            {
+                out << " Global variable " << symbol->getSymbolName();
+            }
+            switch (symbol->getVarType()) {
                 case INT_TYPE:
-                    out << " integer offset=" << symbol.getAddress() << endl;
+                    out << " integer offset=" << symbol->getAddress() << endl;
                     address += 4;
                     break;
                 case REAL_TYPE:
-                    out << " real offset=" << symbol.getAddress() << endl;
+                    out << " real offset=" << symbol->getAddress() << endl;
                     address += 8;
                     break;
                 case NONE_TYPE:
@@ -182,12 +202,12 @@ string SymbolTable::printTable(SymbolTable *table)
                 break;
         case CONSTANT_SYMBOL:
             out << "; " << index++ << " Local number ";
-            if (symbol.getVarType() == INT_TYPE)
+            if (symbol->getVarType() == INT_TYPE)
             {
-                out << symbol.getSymbolValue().intValue
+                out << symbol->getSymbolValue().intValue
                     << " integer" << endl;
             } else {
-                out << symbol.getSymbolValue().doubleValue
+                out << symbol->getSymbolValue().doubleValue
                     << " real" << endl;
             }
 
@@ -212,12 +232,49 @@ int SymbolTable::getAddress()
 
 SymbolTable *SymbolTable::addNewSymbolTable(string name)
 {
-    SymbolTable *newTable = new SymbolTable();
-    newTable->symbols = vector<Symbol>(this->symbols);
+    SymbolTable *newTable = new SymbolTable;
+    newTable->address = 8;
+    newTable->symbols = new vector<Symbol*>;
     newTable->parent = this;
     newTable->name = name;
-    this->children.push_back(newTable);
+
+    for (int i = 0; i < this->symbols->size(); ++i)
+    {
+        newTable->symbols->push_back(this->symbols->at(i));
+    }
+
+    this->children->push_back(newTable);
     return newTable;
+}
+
+void SymbolTable::insertReferenceVariable(Symbol symbolRef, Symbol functionSymbol, int functionToken)
+{
+}
+
+Symbol SymbolTable::lookupFuncReturnReference(string funcName)
+{
+    for (int i = 0; i < this->symbols->size(); ++i) {
+        Symbol *it = this->symbols->at(i);
+        if (it->getSymbolName().compare(funcName) == 0 && it->isSymbolReference()) {
+            return *it;
+        }
+    }
+}
+
+Symbol SymbolTable::lookupReturnVariable(string funcName)
+{
+    int tmpVarIndex = -1;
+    for (int i = 0; i < this->children->size(); ++i)
+    {
+        SymbolTable *table = this->children->at(i);
+        if (table->getName().compare(funcName) == 0)
+        {
+            Symbol s = table->lookupFuncReturnReference(funcName);
+            tmpVarIndex = s.getReferences();
+        }
+    }
+
+    return *this->symbols->at(tmpVarIndex);
 }
 
 SymbolTable *symbolTable = new SymbolTable();

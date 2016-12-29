@@ -164,8 +164,19 @@ subprogram_head:
     FUNCTION ID arguments ':' standard_type ';' {
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
         symbol.setSymbolType(FUNCTION_SYMBOL);
-        codeGenerator->generateLabelStatement(symbol.getSymbolName());
+        symbol.setReturnType($5 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+        tmp = symbolTable;
+        symbolTable = symbolTable->addNewSymbolTable(symbol.getSymbolName());
+        int tmpValue = symbolTable->createTemporaryVariable($5 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+        Symbol &tmpS = symbolTable->getSymbolByIndex(tmpValue);
+        tmpS.setIsReference(true);
+        tmpS.setSymbolName(symbol.getSymbolName());
+        int refId = tmp->createTemporaryVariable($5 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE);
+        tmpS.setReferences(refId);
+        Symbol &funcRetSymbol = tmp->getSymbolByIndex(refId);
+        codeGenerator->generateLabelStatement(funcRetSymbol.getSymbolName());
         codeGenerator->generateProcedureEnterStatement(pendingSymbols.size());
+        symbolTable->insertConstant((int) pendingSymbols.size() * 4);
         pendingSymbols.clear();
     }
     | PROCEDURE ID arguments ';' {
@@ -210,19 +221,32 @@ statement:
         Symbol src = symbolTable->getSymbolByIndex($1);
         Symbol dst = symbolTable->getSymbolByIndex($3);
 
-        if (src.getVarType() == REAL_TYPE && dst.getVarType() == INT_TYPE) {
-            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
-            Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
-            codeGenerator->generateIntToRealStatement(dst, tmpSymbol);
-            codeGenerator->generateMovStatement(src, tmpSymbol, REAL_TYPE);
-        } else if (dst.getVarType() == REAL_TYPE && src.getVarType() == INT_TYPE) {
-            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
-            Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
-            codeGenerator->generateIntToRealStatement(src, tmpSymbol);
-            codeGenerator->generateMovStatement(tmpSymbol, src, REAL_TYPE);
+        if (dst.getSymbolType() == FUNCTION_SYMBOL) {
+            Symbol returnVar = symbolTable->lookupReturnVariable(dst.getSymbolName());
+            codeGenerator->generatePushStatement(returnVar);
+            codeGenerator->generateCallStatement(dst.getSymbolName());
+            codeGenerator->generateIncSPStatement(1);
+            symbolTable->insertConstant(4);
+            symbolTable->localSpaceAddress -= 4;
+            codeGenerator->generateMovStatement(src, returnVar, src.getVarType());
+        } else if (src.getSymbolType() == FUNCTION_SYMBOL) {
+            Symbol symbolRef = symbolTable->lookupFuncReturnReference(src.getSymbolName());
+            codeGenerator->generateMovStatement(symbolRef, dst, symbolRef.getVarType());
         } else {
-            VarType varType = src.getVarType();
-            codeGenerator->generateMovStatement(src, dst, varType);
+            if (src.getVarType() == REAL_TYPE && dst.getVarType() == INT_TYPE) {
+                int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+                Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+                codeGenerator->generateIntToRealStatement(dst, tmpSymbol);
+                codeGenerator->generateMovStatement(src, tmpSymbol, REAL_TYPE);
+            } else if (dst.getVarType() == REAL_TYPE && src.getVarType() == INT_TYPE) {
+                int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+                Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+                codeGenerator->generateIntToRealStatement(src, tmpSymbol);
+                codeGenerator->generateMovStatement(tmpSymbol, src, REAL_TYPE);
+            } else {
+                VarType varType = src.getVarType();
+                codeGenerator->generateMovStatement(src, dst, varType);
+            }
         }
     }
     | procedure_statement
@@ -253,7 +277,6 @@ procedure_statement:
         } else {
             codeGenerator->generateCallStatement(procedureSymbol.getSymbolName());
         }
-
         arguments.clear();
     }
     ;
@@ -311,12 +334,8 @@ expression:
 simple_expression:
     term
     | sign term
-    | simple_expression OR term {
-
-    }
-    | simple_expression AND term {
-
-    }
+    | simple_expression OR term
+    | simple_expression AND term
     ;
 
 term: 

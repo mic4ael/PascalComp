@@ -13,13 +13,15 @@ private:
     string name;
     int address;
     SymbolTable *parent;
-    vector<Symbol> symbols;
-    vector<SymbolTable*> children;
     int temporaryVariableCount;
     string printTable(SymbolTable *table);
 
 public:
+    vector<Symbol*> *symbols;
+    vector<SymbolTable*> *children;
+    int localSpaceAddress;
     SymbolTable();
+    ~SymbolTable();
     int lookupSymbol(const char *symbol);
     int lookupSymbol(int intValue);
     int lookupSymbol(double doubleValue);
@@ -33,6 +35,13 @@ public:
     void increaseAddress(int increaseBy);
     int getAddress();
     SymbolTable *addNewSymbolTable(string name);
+    void insertReferenceVariable(Symbol ref, Symbol function, int functionToken);
+    string getName()
+    {
+        return this->name;
+    }
+    Symbol lookupFuncReturnReference(string funcName);
+    Symbol lookupReturnVariable(string funcName);
 };
 
 #endif

@@ -2,6 +2,8 @@
 
 Symbol::Symbol()
 {
+    this->references = -1;
+    this->isReference = false;
     this->address = 0;
     this->type = NONE_TYPE;
     this->symbolType = NONE_SYMBOL;
@@ -9,6 +11,8 @@ Symbol::Symbol()
 
 Symbol::Symbol(int value)
 {
+    this->references = -1;
+    this->isReference = false;
     this->address = 0;
     this->value.intValue = value;
     this->type = INT_TYPE;
@@ -17,6 +21,8 @@ Symbol::Symbol(int value)
 
 Symbol::Symbol(double value)
 {
+    this->references = -1;
+    this->isReference = false;
     this->address = 0;
     this->value.doubleValue = value;
     this->type = REAL_TYPE;

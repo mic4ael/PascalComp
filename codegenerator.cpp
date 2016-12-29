@@ -23,10 +23,42 @@ void CodeGenerator::generateLabelStatement(string labelName)
 void CodeGenerator::generateMovStatement(Symbol src, Symbol dst, VarType varType)
 {
     char opType = varType == INT_TYPE ? 'i' : 'r';
-    cout << "\tmov." << opType << " "
-         << dst.getAddress() << "," << src.getAddress();
-    cout << "\t;mov." << opType << " "
-         << dst.getSymbolName() << "," << src.getSymbolName() << endl;
+    cout << "\tmov." << opType << " ";
+    if (dst.getSymbolType() == CONSTANT_SYMBOL) {
+        cout << "#" << dst.getSymbolValue().intValue;
+    } else {
+        cout << " ";
+        if (dst.isSymbolReference())
+        {
+            cout << "*BP+" << dst.getAddress();
+        }
+        else
+        {
+            cout << dst.getAddress();
+        }
+    }
+
+    if (src.isSymbolReference())
+    {
+        cout << "," << "*BP+" << src.getAddress();
+    }
+    else
+    {
+        cout << "," << src.getAddress();
+    }
+
+    cout << "\t;mov." << opType << " ";
+
+    if (dst.getSymbolType() == CONSTANT_SYMBOL)
+    {
+        cout << dst.getSymbolValue().intValue;
+    }
+    else
+    {
+        cout << dst.getSymbolName();
+    }
+
+    cout << "," << src.getSymbolName() << endl;
 }
 
 void CodeGenerator::generateAssignmentStatement()
@@ -89,7 +121,30 @@ void CodeGenerator::generateSubProgramReturnStatements()
 
 void CodeGenerator::generateCallStatement(string procedureName)
 {
-    cout << "\tcall.i #" << procedureName << endl;
+    cout << "\tcall.i #" << procedureName
+         << "\t; call.i &" << procedureName
+         << endl;
+}
+
+void CodeGenerator::generatePushStatement(Symbol symbol)
+{
+    cout << "\tpush.i #" << symbol.getAddress();
+
+    if (symbol.isSymbolReference())
+    {
+        cout << "\t; push.i &" << symbol.getSymbolName();
+    }
+    else
+    {
+        cout << "\t; push.i #" << symbol.getSymbolName();
+    }
+
+    cout << endl;
+}
+
+void CodeGenerator::generateIncSPStatement(int numberOfPushes)
+{
+    cout << "\tincsp.i #" << numberOfPushes * 4 << endl;
 }
 
 CodeGenerator *codeGenerator = new CodeGenerator();
