@@ -197,12 +197,8 @@ arguments:
     ;
 
 parameter_list:
-    identifier_list ':' type {
-        cout << pendingSymbols.size() << endl;
-    }
-    | parameter_list ';' identifier_list ':' type {
-        cout << pendingSymbols.size() << endl;
-    }
+    identifier_list ':' type
+    | parameter_list ';' identifier_list ':' type
     ;
 
 compound_statement:
@@ -230,8 +226,8 @@ statement:
             symbolTable->localSpaceAddress -= 4;
             codeGenerator->generateMovStatement(src, returnVar, src.getVarType());
         } else if (src.getSymbolType() == FUNCTION_SYMBOL) {
-            Symbol symbolRef = symbolTable->lookupFuncReturnReference(src.getSymbolName());
-            codeGenerator->generateMovStatement(symbolRef, dst, symbolRef.getVarType());
+            Symbol *symbolRef = symbolTable->lookupFuncReturnReference(src.getSymbolName());
+            codeGenerator->generateMovStatement(*symbolRef, dst, symbolRef->getVarType());
         } else {
             if (src.getVarType() == REAL_TYPE && dst.getVarType() == INT_TYPE) {
                 int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);

@@ -247,18 +247,16 @@ SymbolTable *SymbolTable::addNewSymbolTable(string name)
     return newTable;
 }
 
-void SymbolTable::insertReferenceVariable(Symbol symbolRef, Symbol functionSymbol, int functionToken)
-{
-}
-
-Symbol SymbolTable::lookupFuncReturnReference(string funcName)
+Symbol* SymbolTable::lookupFuncReturnReference(string funcName)
 {
     for (int i = 0; i < this->symbols->size(); ++i) {
         Symbol *it = this->symbols->at(i);
         if (it->getSymbolName().compare(funcName) == 0 && it->isSymbolReference()) {
-            return *it;
+            return it;
         }
     }
+
+    return NULL;
 }
 
 Symbol SymbolTable::lookupReturnVariable(string funcName)
@@ -269,8 +267,8 @@ Symbol SymbolTable::lookupReturnVariable(string funcName)
         SymbolTable *table = this->children->at(i);
         if (table->getName().compare(funcName) == 0)
         {
-            Symbol s = table->lookupFuncReturnReference(funcName);
-            tmpVarIndex = s.getReferences();
+            Symbol *s = table->lookupFuncReturnReference(funcName);
+            tmpVarIndex = s->getReferences();
         }
     }
 

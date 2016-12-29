@@ -35,12 +35,11 @@ public:
     void increaseAddress(int increaseBy);
     int getAddress();
     SymbolTable *addNewSymbolTable(string name);
-    void insertReferenceVariable(Symbol ref, Symbol function, int functionToken);
     string getName()
     {
         return this->name;
     }
-    Symbol lookupFuncReturnReference(string funcName);
+    Symbol* lookupFuncReturnReference(string funcName);
     Symbol lookupReturnVariable(string funcName);
 };
 

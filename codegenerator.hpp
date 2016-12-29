@@ -3,6 +3,7 @@
 
 #include <string>
 #include <iostream>
+#include <fstream>
 
 #include "symbol.hpp"
 
@@ -11,8 +12,12 @@ using namespace std;
 
 class CodeGenerator
 {
+private:
+    ofstream outputFile;
+
 public:
     CodeGenerator();
+    ~CodeGenerator();
 
     void generateExitStatement();
     void generateJumpStatement(string labelName);

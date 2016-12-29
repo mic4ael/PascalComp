@@ -5,3 +5,4 @@ lexer.hpp
 parser.cpp
 parser.hpp
 main
+output.asm
