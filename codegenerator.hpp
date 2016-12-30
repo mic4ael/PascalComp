@@ -31,6 +31,8 @@ public:
     void generateWriteStatement(Symbol symbol);
     void generateReadStatement();
     void generateArithmeticStatement(Symbol left, Symbol right, Symbol dst, char op);
+    void generateDivStatement(Symbol left, Symbol right, Symbol dst);
+    void generateModStatement(Symbol left, Symbol right, Symbol dst);
     void generateIntToRealStatement(Symbol src, Symbol dst);
     void generateRealToIntStatement(Symbol src, Symbol dst);
     void generateProcedureEnterStatement(string func, int numberOfArguments);

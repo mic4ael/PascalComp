@@ -64,9 +64,11 @@ int funcCall = -1;
 %token ASSIGN
 %token ID
 
+%left OR
 %left AND
 %right PLUS MINUS
-%left '*' '/'
+%left DIV MOD
+%left MULTIPLICATION DIVISION
 
 %%
 
@@ -373,7 +375,25 @@ expression_list:
 
 expression:
     simple_expression
-    | simple_expression EQUAL simple_expression
+    | simple_expression EQUAL simple_expression {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+        Symbol trueLabel = symbolTable->getSymbolByIndex(symbolTable->createLabel(false));
+        Symbol falseLabel = symbolTable->getSymbolByIndex(symbolTable->createLabel(false));
+        int resultId = symbolTable->createTemporaryVariable(INT_TYPE);
+        Symbol tmpSymbol = symbolTable->getSymbolByIndex(resultId);
+        Symbol falseConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(0));
+        Symbol trueConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(1));
+
+        codeGenerator->generateJumpEqualStatement(left, right, trueLabel);
+        codeGenerator->generateMovStatement(tmpSymbol, falseConstant, INT_TYPE);
+        codeGenerator->generateJumpStatement(falseLabel.getSymbolName());
+
+        codeGenerator->generateLabelStatement(trueLabel.getSymbolName());
+        codeGenerator->generateMovStatement(tmpSymbol, trueConstant, INT_TYPE);
+        codeGenerator->generateLabelStatement(falseLabel.getSymbolName());
+
+    }
     | simple_expression NOT_EQUAL simple_expression
     | simple_expression LESS simple_expression {
         Symbol left = symbolTable->getSymbolByIndex($1);
@@ -453,7 +473,7 @@ simple_expression:
         if ('+' == yytext[0])
             codeGenerator->generateArithmeticStatement(left, right, dst, '+');
         else
-            codeGenerator->generateArithmeticStatement(left, right, dst, '+');
+            codeGenerator->generateArithmeticStatement(left, right, dst, '-');
     }
     | simple_expression OR term {
         Symbol left = symbolTable->getSymbolByIndex($1);
@@ -483,9 +503,86 @@ term:
 
         $$ = tmpReturnId;
     }
-    | term DIV factor
-    | term MOD factor
-    | term DIVISION factor
+    | term DIV factor {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+        int tmpIndex = -1;
+        Symbol tmpSymbol;
+
+        if (left.getVarType() == REAL_TYPE && right.getVarType() == INT_TYPE) {
+            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+            codeGenerator->generateIntToRealStatement(right, tmpSymbol);
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            right = tmpSymbol;
+        } else if (right.getVarType() == REAL_TYPE && left.getVarType() == INT_TYPE) {
+            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+            codeGenerator->generateIntToRealStatement(left, tmpSymbol);
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            left = tmpSymbol;
+        } else {
+            tmpIndex = symbolTable->createTemporaryVariable(INT_TYPE);
+        }
+
+        Symbol dst = symbolTable->getSymbolByIndex(tmpIndex);
+        codeGenerator->generateDivStatement(left, right, dst);
+        $$ = tmpIndex;
+    }
+    | term MOD factor {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+        int tmpIndex = -1;
+        Symbol tmpSymbol;
+
+        if (left.getVarType() == REAL_TYPE && right.getVarType() == INT_TYPE) {
+            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+            codeGenerator->generateIntToRealStatement(right, tmpSymbol);
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            right = tmpSymbol;
+        } else if (right.getVarType() == REAL_TYPE && left.getVarType() == INT_TYPE) {
+            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+            codeGenerator->generateIntToRealStatement(left, tmpSymbol);
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            left = tmpSymbol;
+        } else {
+            tmpIndex = symbolTable->createTemporaryVariable(INT_TYPE);
+        }
+
+        Symbol dst = symbolTable->getSymbolByIndex(tmpIndex);
+        codeGenerator->generateModStatement(left, right, dst);
+
+        $$ = tmpIndex;
+    }
+    | term DIVISION factor {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+        int tmpIndex = -1;
+        Symbol tmpSymbol;
+
+        if (left.getVarType() == REAL_TYPE && right.getVarType() == INT_TYPE) {
+            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+            codeGenerator->generateIntToRealStatement(right, tmpSymbol);
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            right = tmpSymbol;
+        } else if (right.getVarType() == REAL_TYPE && left.getVarType() == INT_TYPE) {
+            int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
+            codeGenerator->generateIntToRealStatement(left, tmpSymbol);
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            left = tmpSymbol;
+        } else {
+            tmpIndex = symbolTable->createTemporaryVariable(INT_TYPE);
+        }
+
+        Symbol dst = symbolTable->getSymbolByIndex(tmpIndex);
+        codeGenerator->generateArithmeticStatement(left, right, dst, '/');
+
+        $$ = tmpIndex;
+    }
     | term MULTIPLICATION factor {
         Symbol left = symbolTable->getSymbolByIndex($1);
         Symbol right = symbolTable->getSymbolByIndex($3);

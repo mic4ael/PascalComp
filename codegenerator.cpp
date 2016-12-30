@@ -64,14 +64,32 @@ void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbo
              << right.getASMOperand() << "," << dst.getASMOperand() << endl;
         break;
     case '*':
-        this->output << "\tmul." << operationType << " " << left.getAddress() << ","
-                         << right.getAddress() << "," << dst.getAddress() << endl;
+        this->output << "\tmul." << operationType << " " << left.getASMOperand() << ","
+                         << right.getASMOperand() << "," << dst.getASMOperand() << endl;
         break;
     case '-':
-        this->output << "\tsub." << operationType << " " << left.getAddress() << ","
-                         << right.getAddress() << "," << dst.getAddress() << endl;
+        this->output << "\tsub." << operationType << " " << left.getASMOperand() << ","
+                         << right.getASMOperand() << "," << dst.getASMOperand() << endl;
+        break;
+    case '/':
+        this->output << "\tdiv." << operationType << " " << left.getASMOperand() << ","
+                         << right.getASMOperand() << "," << dst.getASMOperand() << endl;
         break;
     }
+}
+
+void CodeGenerator::generateDivStatement(Symbol left, Symbol right, Symbol dst)
+{
+    char operationType = left.getVarType() == INT_TYPE ? 'i' : 'r';
+    this->output << "\tdiv." << operationType << " " << left.getASMOperand() << ","
+                 << right.getASMOperand() << "," << dst.getASMOperand() << endl;
+}
+
+void CodeGenerator::generateModStatement(Symbol left, Symbol right, Symbol dst)
+{
+    char operationType = left.getVarType() == INT_TYPE ? 'i' : 'r';
+    this->output << "\tmod." << operationType << " " << left.getASMOperand() << ","
+                 << right.getASMOperand() << "," << dst.getASMOperand() << endl;
 }
 
 void CodeGenerator::generateIntToRealStatement(Symbol src, Symbol dst)

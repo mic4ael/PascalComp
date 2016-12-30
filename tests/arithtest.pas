@@ -15,7 +15,7 @@ begin
   i:=0;
   j:=1;
   k:=3;
-  if i or j and k then write(1) else write (0);
+  if i or j and k then write(1) else write(0);
   while i<k 
   do
   begin

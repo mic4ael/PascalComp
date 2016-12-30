@@ -69,6 +69,8 @@ int SymbolTable::lookupSymbol(int intValue)
 
     for (int i = 0; i < this->symbols->size(); ++i)
     {
+        if (this->symbols->at(i)->getSymbolType() != CONSTANT_SYMBOL)
+            continue;
         if (this->symbols->at(i)->getVarType() == INT_TYPE && this->symbols->at(i)->getSymbolValue().intValue == intValue)
         {
             return i;
