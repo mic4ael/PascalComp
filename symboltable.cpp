@@ -98,16 +98,21 @@ int SymbolTable::lookupSymbol(double doubleValue)
 int SymbolTable::createTemporaryVariable(VarType varType)
 {
     string tmp = "$t";
-    tmp += std::to_string(this->temporaryVariableCount);
+    if (this->getName().compare("global") == 0)
+        tmp += std::to_string(this->temporaryVariableCount);
+    else
+        tmp += std::to_string(this->parent->temporaryVariableCount);
+    
     Symbol *s = new Symbol(tmp);
     s->setVarType(varType);
     s->setSymbolType(VAR_SYMBOL);
     if (this->name.compare("global") != 0)
     {
+        this->enterArg += (varType == INT_TYPE ? 4 : 8);
         s->setIsLocal(true);
-        s->setAddress(this->lastLocalSpaceAddress);
         this->lastLocalSpaceAddress = this->localSpaceAddress;
-        this->localSpaceAddress -= varType == INT_TYPE ? 4 : 8;
+        this->localSpaceAddress -= (varType == INT_TYPE ? 4 : 8);
+        s->setAddress(this->enterArg * -1);
     }
     else
     {
@@ -115,7 +120,10 @@ int SymbolTable::createTemporaryVariable(VarType varType)
         this->address += varType == INT_TYPE ? 4 : 8;
     }
 
-    this->temporaryVariableCount += 1;
+    if (this->getName().compare("global") == 0)
+        this->temporaryVariableCount += 1;
+    else
+        this->parent->temporaryVariableCount += 1;
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
 }
@@ -164,11 +172,11 @@ int SymbolTable::insertConstant(int intValue)
 
     Symbol *s = new Symbol(intValue);
     s->setAddress(this->address);
-    if (this->name.compare("global") != 0)
-    {
-        this->lastLocalSpaceAddress = this->localSpaceAddress;
-        this->localSpaceAddress -= 4;
-    }
+    // if (this->name.compare("global") != 0)
+    // {
+    //     this->lastLocalSpaceAddress = this->localSpaceAddress;
+    //     this->localSpaceAddress -= 4;
+    // }
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
 }
@@ -185,11 +193,11 @@ int SymbolTable::insertConstant(double doubleValue)
 
     Symbol *s = new Symbol(doubleValue);
     s->setAddress(this->address);
-    if (this->name.compare("global") != 0)
-    {
-        this->lastLocalSpaceAddress = this->localSpaceAddress;
-        this->localSpaceAddress -= 8;
-    }
+    // if (this->name.compare("global") != 0)
+    // {
+    //     this->lastLocalSpaceAddress = this->localSpaceAddress;
+    //     this->localSpaceAddress -= 8;
+    // }
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
 }
@@ -329,10 +337,9 @@ Symbol* SymbolTable::lookupFuncReturnReference(string funcName)
     return NULL;
 }
 
-Symbol SymbolTable::lookupReturnVariable(Symbol funcSymbol)
+int SymbolTable::lookupReturnVariable(Symbol funcSymbol)
 {
-    int refId = this->createTemporaryVariable(funcSymbol.getReturnType());
-    return *this->symbols->at(refId);
+    return this->createTemporaryVariable(funcSymbol.getReturnType());
 }
 
 int SymbolTable::createReference(string name, VarType type)

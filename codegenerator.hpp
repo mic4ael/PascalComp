@@ -3,7 +3,9 @@
 
 #include <string>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
+#include <sstream>
 
 #include "symbol.hpp"
 
@@ -13,6 +15,7 @@ using namespace std;
 class CodeGenerator
 {
 private:
+    stringstream output;
     ofstream outputFile;
     int numberOfPushes;
 
@@ -30,7 +33,8 @@ public:
     void generateArithmeticStatement(Symbol left, Symbol right, Symbol dst, char op);
     void generateIntToRealStatement(Symbol src, Symbol dst);
     void generateRealToIntStatement(Symbol src, Symbol dst);
-    void generateProcedureEnterStatement(int numberOfArguments);
+    void generateProcedureEnterStatement(string func, int numberOfArguments);
+    void generateEnterPlaceholder(string func);
     void generateSubProgramReturnStatements();
     void generateCallStatement(string procedureName);
     void generatePushStatement(Symbol symbol);

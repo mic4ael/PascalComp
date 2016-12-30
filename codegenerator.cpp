@@ -5,52 +5,54 @@ extern SymbolTable *symbolTable;
 
 CodeGenerator::CodeGenerator()
 {
-    outputFile.open("output.asm");
+    this->outputFile.open("output.asm");
+    this->output.precision(2);
 }
 
 CodeGenerator::~CodeGenerator()
 {
+    this->outputFile << this->output.str();
     this->outputFile.close();
 }
 
 void CodeGenerator::generateExitStatement()
 {
-    this->outputFile << "\texit" << endl;
+    this->output << "\texit" << endl;
 }
 
 void CodeGenerator::generateJumpStatement(string labelName)
 {
-    this->outputFile << "\tjump.i #" << labelName << endl;
+    this->output << "\tjump.i #" << labelName << endl;
 }
 
 void CodeGenerator::generateLabelStatement(string labelName)
 {
-    this->outputFile << labelName << ":" << endl;
+    this->output << labelName << ":" << endl;
 }
 
 void CodeGenerator::generateMovStatement(Symbol src, Symbol dst, VarType varType)
 {
     char opType = varType == INT_TYPE ? 'i' : 'r';
-    this->outputFile << "\tmov." << opType << " " << dst.getASMOperand();
-    this->outputFile << "," << src.getASMOperand();
-    this->outputFile << endl;
+    this->output << "\tmov." << opType << " " << dst.getASMOperand();
+    this->output << "," << src.getASMOperand();
+    this->output << endl;
 }
 
 void CodeGenerator::generateAssignmentStatement()
 {
-    this->outputFile << "\tmov" << endl;
+    this->output << "\tmov" << endl;
 }
 
 void CodeGenerator::generateWriteStatement(Symbol symbol)
 {
     char opType = symbol.getVarType() == INT_TYPE ? 'i' : 'r';
-    this->outputFile << "\twrite." << opType << " "
-         << symbol.getASMOperand() << " " << endl;
+    this->output << "\twrite." << opType << " "
+                     << symbol.getASMOperand() << " " << endl;
 }
 
 void CodeGenerator::generateReadStatement()
 {
-    this->outputFile << "\tread" << endl;
+    this->output << "\tread" << endl;
 }
 
 void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbol dst, char op)
@@ -59,15 +61,15 @@ void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbo
     switch (op)
     {
     case '+':
-        this->outputFile << "\tadd." << operationType << " " << left.getASMOperand() << ","
+        this->output << "\tadd." << operationType << " " << left.getASMOperand() << ","
              << right.getASMOperand() << "," << dst.getASMOperand() << endl;
         break;
     case '*':
-        this->outputFile << "\tmul." << operationType << " " << left.getAddress() << ","
+        this->output << "\tmul." << operationType << " " << left.getAddress() << ","
                          << right.getAddress() << "," << dst.getAddress() << endl;
         break;
     case '-':
-        this->outputFile << "\tsub." << operationType << " " << left.getAddress() << ","
+        this->output << "\tsub." << operationType << " " << left.getAddress() << ","
                          << right.getAddress() << "," << dst.getAddress() << endl;
         break;
     }
@@ -75,37 +77,54 @@ void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbo
 
 void CodeGenerator::generateIntToRealStatement(Symbol src, Symbol dst)
 {
-    this->outputFile << "\tinttoreal.i " << src.getASMOperand() << "," << dst.getASMOperand()
-         << endl;
+    this->output << "\tinttoreal.i " << src.getASMOperand() << "," << dst.getASMOperand()
+                 << endl;
 }
 
 void CodeGenerator::generateRealToIntStatement(Symbol src, Symbol dst)
 {
-    this->outputFile << "\trealtoint.r " << src.getAddress() << "," << dst.getAddress()
-         << endl;
+    this->output << "\trealtoint.r " << src.getAddress() << "," << dst.getAddress()
+                 << endl;
 }
 
-void CodeGenerator::generateProcedureEnterStatement(int numberOfArguments)
+bool replace(std::string& str, const std::string& from, const std::string& to) {
+    size_t start_pos = str.find(from);
+    if (start_pos == std::string::npos)
+        return false;
+    str.replace(start_pos, from.length(), to);
+    return true;
+}
+
+void CodeGenerator::generateProcedureEnterStatement(string func, int num)
 {
-    this->outputFile << "\tenter.i #" << 4 * numberOfArguments << endl;
+    string s("$enter-" + func);
+    string tmp(this->output.str());
+    replace(tmp, s, "enter.i #" + std::to_string(num));
+    this->output.str("");
+    this->output << tmp;
+}
+
+void CodeGenerator::generateEnterPlaceholder(string func)
+{
+    this->output << "\t$enter-" << func << endl;
 }
 
 void CodeGenerator::generateSubProgramReturnStatements()
 {
-    this->outputFile << "\tleave" << endl
-         << "\treturn" << endl;
+    this->output << "\tleave" << endl
+                 << "\treturn" << endl;
 }
 
 void CodeGenerator::generateCallStatement(string procedureName)
 {
-    this->outputFile << "\tcall.i #" << procedureName << endl;
+    this->output << "\tcall.i #" << procedureName << endl;
 }
 
 void CodeGenerator::generatePushStatement(Symbol symbol)
 {
     this->numberOfPushes += 1;
-    this->outputFile << "\tpush.i #" << symbol.getAddress();
-    this->outputFile << endl;
+    this->output << "\tpush.i #" << symbol.getAddress();
+    this->output << endl;
 }
 
 void CodeGenerator::generateIncSPStatement()
@@ -113,7 +132,7 @@ void CodeGenerator::generateIncSPStatement()
     if (this->numberOfPushes != 0)
     {
         symbolTable->insertConstant(this->numberOfPushes * 4);
-        this->outputFile << "\tincsp.i #" << this->numberOfPushes * 4 << endl;
+        this->output << "\tincsp.i #" << this->numberOfPushes * 4 << endl;
         this->numberOfPushes = 0;
     }
 }

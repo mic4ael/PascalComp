@@ -16,9 +16,10 @@ private:
     string printTable(SymbolTable *table);
 
 public:
+    int enterArg;
     int temporaryVariableCount;
-    vector<Symbol*> *symbols;
-    vector<SymbolTable*> *children;
+    vector<Symbol *> *symbols;
+    vector<SymbolTable *> *children;
     int localSpaceAddress;
     int lastLocalSpaceAddress;
     SymbolTable();
@@ -27,7 +28,7 @@ public:
     int lookupSymbol(int intValue);
     int lookupSymbol(double doubleValue);
     int createTemporaryVariable(VarType varType);
-    Symbol& getSymbolByIndex(int tokenIndex);
+    Symbol &getSymbolByIndex(int tokenIndex);
     int insertSymbol(const char *symbol);
     int insertSymbol(const char *symbol, VarType varType);
     int insertConstant(int intValue);
@@ -38,10 +39,10 @@ public:
     SymbolTable *addNewSymbolTable(string name);
     string getName()
     {
-        return this->name;
+      return this->name;
     }
     Symbol* lookupFuncReturnReference(string funcName);
-    Symbol lookupReturnVariable(Symbol funcSymbol);
+    int lookupReturnVariable(Symbol funcSymbol);
     int createReference(string name, VarType type);
 };
 

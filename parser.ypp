@@ -24,6 +24,7 @@ std::map<int, VarType> varToTypesMap;
 int programSymbolIndex = -1;
 SymbolTable *tmp;
 std::vector<Symbol> searchFuncArguments(int funcId);
+int funcCall = -1;
 
 %}
 
@@ -44,26 +45,22 @@ std::vector<Symbol> searchFuncArguments(int funcId);
 %token ELSE
 %token WHILE
 %token DO
-%token DIV
-%token MOD
-%token AND
 %token OR
 %token NOT
 %token DOTDOT
 %token PLUS
 %token MINUS
-%token DIVISION
 %token MULTIPLICATION
-%token EQUAL
-%token NOT_EQUAL
-%token LESS
-%token GREATER
-%token EORGREATER
-%token EORLESS
+%token DIVISION
+%token DIV
+%token MOD
+%token AND
+%token RELOP
 %token ASSIGN
 %token ID
 
-%left PLUS MINUS
+%right PLUS MINUS
+%left '(' ')'
 %left '*' '/'
 
 %%
@@ -131,9 +128,11 @@ declarations:
                 symbol.setIsLocal(true);
                 symbol.setAddress(symbolTable->localSpaceAddress);
                 symbolTable->localSpaceAddress -= symbol.getVarType() == INT_TYPE ? 4 : 8;
+                symbolTable->enterArg += (symbol.getVarType() == INT_TYPE ? 4 : 8);
             } else {
                 symbol.setAddress(symbolTable->getAddress());
                 symbolTable->increaseAddress(symbol.getVarType() == INT_TYPE ? 4 : 8);
+                symbolTable->enterArg += (symbol.getVarType() == INT_TYPE ? 4 : 8);
             }
         }
         pendingSymbols.clear();
@@ -159,14 +158,16 @@ subprogram_declarations:
     subprogram_declarations subprogram_declaration ';' {
         if (symbolTable->lastLocalSpaceAddress == -4)
         {
-            symbolTable->insertConstant(0);
+            symbolTable->insertConstant(symbolTable->enterArg);
+            codeGenerator->generateProcedureEnterStatement(symbolTable->getName(), symbolTable->enterArg);
         }
         else
         {
-            symbolTable->insertConstant(symbolTable->temporaryVariableCount * 4);
+            codeGenerator->generateProcedureEnterStatement(symbolTable->getName(), symbolTable->enterArg);
+            symbolTable->insertConstant(symbolTable->enterArg);
         }
 
-        varToTypesMap.clear();
+        varToTypesMap.clear();        
         codeGenerator->generateSubProgramReturnStatements();
         symbolTable = tmp;
         tmp = NULL;
@@ -198,7 +199,7 @@ subprogram_head:
             symbolTable->increaseAddress(4);
         }
         codeGenerator->generateLabelStatement(fSymbol.getSymbolName());
-        codeGenerator->generateProcedureEnterStatement(symbolTable->temporaryVariableCount);
+        codeGenerator->generateEnterPlaceholder(fSymbol.getSymbolName());
     }
     | PROCEDURE ID {
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
@@ -208,7 +209,7 @@ subprogram_head:
     } arguments ';' {
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
         codeGenerator->generateLabelStatement(symbol.getSymbolName());
-        codeGenerator->generateProcedureEnterStatement(symbolTable->temporaryVariableCount);
+        codeGenerator->generateEnterPlaceholder(symbol.getSymbolName());
     }
     ;
 
@@ -266,14 +267,7 @@ statement:
         Symbol src = symbolTable->getSymbolByIndex($1);
         Symbol dst = symbolTable->getSymbolByIndex($3);
 
-        if (dst.getSymbolType() == FUNCTION_SYMBOL) {
-            Symbol returnVar = symbolTable->lookupReturnVariable(dst);
-            codeGenerator->generatePushStatement(returnVar);
-            codeGenerator->generateCallStatement(dst.getSymbolName());
-            codeGenerator->generateIncSPStatement();
-            symbolTable->localSpaceAddress -= 4;
-            codeGenerator->generateMovStatement(src, returnVar, src.getVarType());
-        } else if (src.getSymbolType() == FUNCTION_SYMBOL) {
+        if (src.getSymbolType() == FUNCTION_SYMBOL) {
             Symbol *symbolRef = symbolTable->lookupFuncReturnReference(src.getSymbolName());
             codeGenerator->generateMovStatement(*symbolRef, dst, symbolRef->getVarType());
         } else {
@@ -336,80 +330,53 @@ expression_list:
 
 expression:
     simple_expression
-    | simple_expression EQUAL expression
-    | simple_expression NOT_EQUAL expression
-    | simple_expression GREATER expression
-    | simple_expression LESS expression
-    | simple_expression PLUS expression {
-        Symbol left = symbolTable->getSymbolByIndex($1);
-        Symbol right = symbolTable->getSymbolByIndex($3);
-
-        int tmpIndex = -1;
-        Symbol tmpSymbol;
-        Symbol dst;
-
-        if (left.getVarType() == REAL_TYPE && right.getVarType() == INT_TYPE) {
-            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
-            tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
-            codeGenerator->generateIntToRealStatement(right, tmpSymbol);
-            right = tmpSymbol;
-            $$ = symbolTable->createTemporaryVariable(REAL_TYPE);
-            dst = symbolTable->getSymbolByIndex($$);
-        } else if (right.getVarType() == REAL_TYPE && left.getVarType() == INT_TYPE) {
-            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
-            tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
-            codeGenerator->generateIntToRealStatement(left, tmpSymbol);
-            left = tmpSymbol;
-            $$ = symbolTable->createTemporaryVariable(REAL_TYPE);
-            dst = symbolTable->getSymbolByIndex($$);
-        } else {
-            tmpIndex = symbolTable->createTemporaryVariable(left.getVarType());
-            dst = symbolTable->getSymbolByIndex(tmpIndex);
-            $$ = tmpIndex;
-        }
-
-        codeGenerator->generateArithmeticStatement(left, right, dst, '+');
-    }
-    | simple_expression MINUS expression {
-        Symbol left = symbolTable->getSymbolByIndex($1);
-        Symbol right = symbolTable->getSymbolByIndex($3);
-        int tmpIndex = -1;
-        Symbol tmpSymbol;
-        Symbol dst;
-
-        if (left.getVarType() == REAL_TYPE && right.getVarType() == INT_TYPE) {
-            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
-            tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
-            codeGenerator->generateIntToRealStatement(right, tmpSymbol);
-            right = tmpSymbol;
-            $$ = symbolTable->createTemporaryVariable(REAL_TYPE);
-            dst = symbolTable->getSymbolByIndex($$);
-        } else if (right.getVarType() == REAL_TYPE && left.getVarType() == INT_TYPE) {
-            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
-            tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
-            codeGenerator->generateIntToRealStatement(left, tmpSymbol);
-            left = tmpSymbol;
-            $$ = symbolTable->createTemporaryVariable(REAL_TYPE);
-            dst = symbolTable->getSymbolByIndex($$);
-        } else {
-            tmpIndex = symbolTable->createTemporaryVariable(left.getVarType());
-            dst = symbolTable->getSymbolByIndex(tmpIndex);
-            $$ = tmpIndex;
-        }
-
-        codeGenerator->generateArithmeticStatement(left, right, dst, '-');
-    }
+    | simple_expression RELOP simple_expression
     ;
 
 simple_expression:
     term
     | sign term
+    | simple_expression sign term {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+
+        int tmpIndex = -1;
+        Symbol tmpSymbol;
+        Symbol dst;
+
+        if (left.getVarType() == REAL_TYPE && right.getVarType() == INT_TYPE) {
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
+            codeGenerator->generateIntToRealStatement(right, tmpSymbol);
+            right = tmpSymbol;
+            $$ = symbolTable->createTemporaryVariable(REAL_TYPE);
+            dst = symbolTable->getSymbolByIndex($$);
+        } else if (right.getVarType() == REAL_TYPE && left.getVarType() == INT_TYPE) {
+            tmpIndex = symbolTable->createTemporaryVariable(REAL_TYPE);
+            tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
+            codeGenerator->generateIntToRealStatement(left, tmpSymbol);
+            left = tmpSymbol;
+            $$ = symbolTable->createTemporaryVariable(REAL_TYPE);
+            dst = symbolTable->getSymbolByIndex($$);
+        } else {
+            tmpIndex = symbolTable->createTemporaryVariable(left.getVarType());
+            dst = symbolTable->getSymbolByIndex(tmpIndex);
+            $$ = tmpIndex;
+        }
+
+        if ('+' == yytext[0])
+            codeGenerator->generateArithmeticStatement(left, right, dst, '+');
+        else
+            codeGenerator->generateArithmeticStatement(left, right, dst, '+');
+    }
     | simple_expression OR term
-    | simple_expression AND term
     ;
 
 term: 
     factor
+    | term DIV factor
+    | term MOD factor
+    | term DIVISION factor
     | term MULTIPLICATION factor {
         Symbol left = symbolTable->getSymbolByIndex($1);
         Symbol right = symbolTable->getSymbolByIndex($3);
@@ -436,14 +403,29 @@ term:
         codeGenerator->generateArithmeticStatement(left, right, dst, '*');
         $$ = tmpIndex;
     }
-    | term DIVISION factor
-    | term DIV factor
-    | term MOD factor
     ;
 
 factor:
-    variable
-    | ID '(' expression_list ')' {
+    variable {
+        Symbol symbol = symbolTable->getSymbolByIndex($1);
+        if (symbol.getSymbolType() == FUNCTION_SYMBOL)
+        {
+            int refId = symbolTable->lookupReturnVariable(symbol);
+            Symbol returnVar = symbolTable->getSymbolByIndex(refId);
+            codeGenerator->generatePushStatement(returnVar);
+            codeGenerator->generateCallStatement(symbol.getSymbolName());
+            codeGenerator->generateIncSPStatement();
+            symbolTable->localSpaceAddress -= 4;
+            $$ = refId;
+        }
+        else
+        {
+            $$ = $1;
+        }
+    }
+    | ID {
+        funcCall = $1;
+    } '(' expression_list ')' {
         std::vector<Symbol> funcArgs = searchFuncArguments($1);
         for (int i = 0; i < arguments.size(); ++i)
         {
@@ -478,12 +460,16 @@ factor:
             }
         }
 
-        // Symbol dst = symbolTable->getSymbolByIndex($1);
-        // Symbol returnVar = symbolTable->lookupReturnVariable(dst);
-        // codeGenerator->generatePushStatement(returnVar);
-        // codeGenerator->generateCallStatement(dst.getSymbolName());
-        // codeGenerator->generateIncSPStatement();
-        // symbolTable->localSpaceAddress -= 4;
+        arguments.clear();
+        funcCall = -1;
+        Symbol symbol = symbolTable->getSymbolByIndex($1);
+        int refId = symbolTable->lookupReturnVariable(symbol);
+        Symbol returnVar = symbolTable->getSymbolByIndex(refId);
+        codeGenerator->generatePushStatement(returnVar);
+        codeGenerator->generateCallStatement(symbol.getSymbolName());
+        codeGenerator->generateIncSPStatement();
+        symbolTable->localSpaceAddress -= 4;
+        $$ = refId;
     }
     | INTEGER {
         int symbolIndex = symbolTable->lookupSymbol(atoi(yytext));
