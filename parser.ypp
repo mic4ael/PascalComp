@@ -423,7 +423,18 @@ simple_expression:
         else
             codeGenerator->generateArithmeticStatement(left, right, dst, '+');
     }
-    | simple_expression OR term
+    | simple_expression OR term {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+        int tmpReturnId = symbolTable->createTemporaryVariable(INT_TYPE);
+        Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpReturnId);
+        Symbol falseConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(0));
+        Symbol trueConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(1));
+
+        codeGenerator->generateOrStatement(left, right, tmpSymbol);
+
+        $$ = tmpReturnId;
+    }
     ;
 
 term: 

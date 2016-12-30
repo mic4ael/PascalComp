@@ -165,4 +165,12 @@ void CodeGenerator::generateAndStatement(Symbol left, Symbol right, Symbol to)
                  << endl;
 }
 
+void CodeGenerator::generateOrStatement(Symbol left, Symbol right, Symbol to)
+{
+    this->output << "\tor.i " << left.getASMOperand() << ","
+                 << right.getASMOperand() << ","
+                 << to.getASMOperand()
+                 << endl;
+}
+
 CodeGenerator *codeGenerator = new CodeGenerator();
