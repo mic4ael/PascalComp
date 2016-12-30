@@ -49,9 +49,9 @@ void CodeGenerator::generateWriteStatement(Symbol symbol)
                      << symbol.getASMOperand() << " " << endl;
 }
 
-void CodeGenerator::generateReadStatement()
+void CodeGenerator::generateReadStatement(Symbol symbol)
 {
-    this->output << "\tread" << endl;
+    this->output << "\tread.i" << symbol.getASMOperand() << endl;
 }
 
 void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbol dst, char op)

@@ -357,6 +357,12 @@ procedure_statement:
                 Symbol &argSymbol = symbolTable->getSymbolByIndex(arguments[i]);
                 codeGenerator->generateWriteStatement(argSymbol);
             }
+        } else if (procedureSymbol.getSymbolName().compare("read") == 0) {
+            for (int i = 0; i < arguments.size(); i++)
+            {
+                Symbol &argSymbol = symbolTable->getSymbolByIndex(arguments[i]);
+                codeGenerator->generateReadStatement(argSymbol);
+            }
         } else {
             codeGenerator->generateCallStatement(procedureSymbol.getSymbolName());
         }

@@ -29,7 +29,7 @@ public:
     void generateMovStatement(Symbol src, Symbol dst, VarType varType);
     void generateAssignmentStatement();
     void generateWriteStatement(Symbol symbol);
-    void generateReadStatement();
+    void generateReadStatement(Symbol symbol);
     void generateArithmeticStatement(Symbol left, Symbol right, Symbol dst, char op);
     void generateDivStatement(Symbol left, Symbol right, Symbol dst);
     void generateModStatement(Symbol left, Symbol right, Symbol dst);
