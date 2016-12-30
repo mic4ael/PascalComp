@@ -39,10 +39,10 @@ public:
     void generateCallStatement(string procedureName);
     void generatePushStatement(Symbol symbol);
     void generateIncSPStatement();
-    int getNumberOfPushes()
-    {
-        return this->numberOfPushes;
-    }
+    int getNumberOfPushes() {return this->numberOfPushes;}
+    void generateJumpLessStatement(Symbol left, Symbol right, Symbol label);
+    void generateJumpEqualStatement(Symbol left, Symbol right, Symbol label);
+    void generateAndStatement(Symbol left, Symbol right, Symbol to);
 };
 
 #endif

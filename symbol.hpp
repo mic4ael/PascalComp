@@ -141,12 +141,13 @@ public:
             }
             else
             {
-                return "#" + std::to_string(this->value.doubleValue);
+                std::string doubleStr = std::to_string(this->value.doubleValue);
+                return "#" + doubleStr.erase(doubleStr.find_last_not_of('0') + 3, std::string::npos);
             }
         }
         else
         {
-            return std::to_string(this->address);;
+            return std::to_string(this->address);
         }
     }
 

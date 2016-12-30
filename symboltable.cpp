@@ -8,7 +8,8 @@ using namespace std;
 
 SymbolTable::SymbolTable()
 {
-    this->children = new vector<SymbolTable*>();
+    this->nextLabelId = 0;
+    this->children = new vector<SymbolTable *>();
     this->symbols = new vector<Symbol*>();
     this->address = 0;
     this->name = "global";
@@ -68,7 +69,7 @@ int SymbolTable::lookupSymbol(int intValue)
 
     for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols->at(i)->getSymbolValue().intValue == intValue)
+        if (this->symbols->at(i)->getVarType() == INT_TYPE && this->symbols->at(i)->getSymbolValue().intValue == intValue)
         {
             return i;
         }
@@ -86,7 +87,9 @@ int SymbolTable::lookupSymbol(double doubleValue)
 
     for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols->at(i)->getSymbolValue().doubleValue == doubleValue)
+        if (this->symbols->at(i)->getSymbolType() != CONSTANT_SYMBOL)
+            continue;
+        if (this->symbols->at(i)->getVarType() == REAL_TYPE && this->symbols->at(i)->getSymbolValue().doubleValue == doubleValue)
         {
             return i;
         }
@@ -164,7 +167,8 @@ int SymbolTable::insertConstant(int intValue)
 {
     for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols->at(i)->getSymbolType() == CONSTANT_SYMBOL && this->symbols->at(i)->getSymbolValue().intValue == intValue)
+        Symbol symbol = *this->symbols->at(i);
+        if (symbol.getVarType() == INT_TYPE && symbol.getSymbolType() == CONSTANT_SYMBOL && symbol.getSymbolValue().intValue == intValue)
         {
             return i;
         }
@@ -181,11 +185,12 @@ int SymbolTable::insertConstant(int intValue)
     return this->symbols->size() - 1;
 }
 
-int SymbolTable::insertConstant(double doubleValue)
+int SymbolTable::insertDoubleConstant(double doubleValue)
 {
     for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols->at(i)->getSymbolType() == CONSTANT_SYMBOL && this->symbols->at(i)->getSymbolValue().doubleValue == doubleValue)
+        Symbol symbol = *this->symbols->at(i);
+        if (symbol.getVarType() == REAL_TYPE && symbol.getSymbolType() == CONSTANT_SYMBOL && symbol.getSymbolValue().doubleValue == doubleValue)
         {
             return i;
         }
@@ -352,6 +357,29 @@ int SymbolTable::createReference(string name, VarType type)
     this->address += 4;
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
+}
+
+int SymbolTable::createLabel(bool pending)
+{
+    string labelName("lab" + std::to_string(this->nextLabelId++));
+    Symbol *s = new Symbol(labelName);
+    s->setSymbolType(LABEL_SYMBOL);
+    if (pending)
+    {
+        this->pendingLabels.push_back(labelName);
+    }
+    this->symbols->push_back(s);
+    return this->symbols->size() - 1;
+}
+
+string SymbolTable::getNextLabel(bool remove)
+{
+    string ret = this->pendingLabels[0];
+    if (this->pendingLabels.size() == 0)
+        return "";
+    if (remove)
+        this->pendingLabels.erase(this->pendingLabels.begin());
+    return ret;
 }
 
 SymbolTable *symbolTable = new SymbolTable();

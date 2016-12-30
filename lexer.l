@@ -58,12 +58,12 @@ ID {LETTER}({LETTER}|{DIGIT})*
 "-" return MINUS;
 "/" return DIVISION;
 "*" return MULTIPLICATION;
-"=" return RELOP;
-"<>" return RELOP;
-"<" return RELOP;
-">" return RELOP;
-">=" return RELOP;
-"<=" return RELOP;
+"=" return EQUAL;
+"<>" return NOT_EQUAL;
+"<" return LESS;
+">" return GREATER;
+">=" return GREATER_OR_EQUAL;
+"<=" return LESS_OR_EQUAL;
 ":=" return ASSIGN;
 
 {INTEGER} {

@@ -55,12 +55,17 @@ int funcCall = -1;
 %token DIV
 %token MOD
 %token AND
-%token RELOP
+%token EQUAL
+%token NOT_EQUAL
+%token LESS
+%token GREATER
+%token GREATER_OR_EQUAL
+%token LESS_OR_EQUAL
 %token ASSIGN
 %token ID
 
+%left AND
 %right PLUS MINUS
-%left '(' ')'
 %left '*' '/'
 
 %%
@@ -82,12 +87,11 @@ program:
 
 program_compound_statement:
     BEGIN_TOKEN {
-        Symbol &programSymbol = symbolTable->getSymbolByIndex(programSymbolIndex);
-        codeGenerator->generateLabelStatement(programSymbol.getSymbolName());
+        string programLabel = symbolTable->getNextLabel();
+        codeGenerator->generateLabelStatement(programLabel);
     }
     statement_list
     END_TOKEN '.' {
-        Symbol &programSymbol = symbolTable->getSymbolByIndex(programSymbolIndex);
         codeGenerator->generateExitStatement();
     }
     ;
@@ -95,8 +99,7 @@ program_compound_statement:
 program_id:
     ID {
         programSymbolIndex = $1;
-        Symbol &programSymbol = symbolTable->getSymbolByIndex($1);
-        programSymbol.setSymbolType(LABEL_SYMBOL);
+        Symbol programSymbol = symbolTable->getSymbolByIndex(symbolTable->createLabel(true));
         codeGenerator->generateJumpStatement(programSymbol.getSymbolName());
     }
     ;
@@ -283,13 +286,40 @@ statement:
                 codeGenerator->generateMovStatement(tmpSymbol, src, REAL_TYPE);
             } else {
                 VarType varType = src.getVarType();
+                if (dst.getSymbolType() == CONSTANT_SYMBOL)
+                {
+                    int index = -1;
+                    if (dst.getVarType() == INT_TYPE)
+                    {
+                        index = symbolTable->insertConstant(dst.getSymbolValue().intValue);
+                    }
+                    else
+                    {
+                        index = symbolTable->insertDoubleConstant(dst.getSymbolValue().doubleValue);
+                    }
+
+                    dst = symbolTable->getSymbolByIndex(index);
+                }
+
                 codeGenerator->generateMovStatement(src, dst, varType);
             }
         }
     }
     | procedure_statement
     | compound_statement
-    | IF expression THEN statement ELSE statement
+    | IF expression THEN {
+        Symbol zeroConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(0));
+        Symbol expression = symbolTable->getSymbolByIndex($2);
+        Symbol label = symbolTable->getSymbolByIndex(symbolTable->createLabel(true));
+        
+        symbolTable->createLabel(true);
+        codeGenerator->generateJumpEqualStatement(expression, zeroConstant, label);
+    } statement {
+        codeGenerator->generateJumpStatement(symbolTable->getLastPendingLabel());
+        codeGenerator->generateLabelStatement(symbolTable->getNextLabel());
+    } ELSE statement {
+        codeGenerator->generateLabelStatement(symbolTable->getNextLabel());
+    }
     | WHILE expression DO statement
     | /* ignore */
     ;
@@ -330,7 +360,31 @@ expression_list:
 
 expression:
     simple_expression
-    | simple_expression RELOP simple_expression
+    | simple_expression EQUAL simple_expression
+    | simple_expression NOT_EQUAL simple_expression
+    | simple_expression LESS simple_expression {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+        Symbol trueLabel = symbolTable->getSymbolByIndex(symbolTable->createLabel(false));
+        Symbol falseLabel = symbolTable->getSymbolByIndex(symbolTable->createLabel(false));
+        int resultId = symbolTable->createTemporaryVariable(INT_TYPE);
+        Symbol tmpSymbol = symbolTable->getSymbolByIndex(resultId);
+        Symbol falseConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(0));
+        Symbol trueConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(1));
+        
+        codeGenerator->generateJumpLessStatement(left, right, trueLabel);
+        codeGenerator->generateMovStatement(tmpSymbol, falseConstant, INT_TYPE);
+        codeGenerator->generateJumpStatement(falseLabel.getSymbolName());
+
+        codeGenerator->generateLabelStatement(trueLabel.getSymbolName());
+        codeGenerator->generateMovStatement(tmpSymbol, trueConstant, INT_TYPE);
+        codeGenerator->generateLabelStatement(falseLabel.getSymbolName());
+
+        $$ = resultId;
+    }
+    | simple_expression GREATER simple_expression
+    | simple_expression LESS_OR_EQUAL simple_expression
+    | simple_expression GREATER_OR_EQUAL simple_expression
     ;
 
 simple_expression:
@@ -374,6 +428,18 @@ simple_expression:
 
 term: 
     factor
+    | term AND factor {
+        Symbol left = symbolTable->getSymbolByIndex($1);
+        Symbol right = symbolTable->getSymbolByIndex($3);
+        int tmpReturnId = symbolTable->createTemporaryVariable(INT_TYPE);
+        Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpReturnId);
+        Symbol falseConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(0));
+        Symbol trueConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(1));
+
+        codeGenerator->generateAndStatement(left, right, tmpSymbol);
+
+        $$ = tmpReturnId;
+    }
     | term DIV factor
     | term MOD factor
     | term DIVISION factor
@@ -481,10 +547,10 @@ factor:
         }
     }
     | REAL {
-        int symbolIndex = symbolTable->lookupSymbol(atof(yytext));
+        int symbolIndex = symbolTable->lookupSymbol((double) atof(yytext));
         if (symbolIndex == -1)
         {
-            $$ = symbolTable->insertConstant(atof(yytext));
+            $$ = symbolTable->insertDoubleConstant((double) atof(yytext));
         } else {
             $$ = symbolIndex;
         }

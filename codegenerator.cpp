@@ -6,7 +6,6 @@ extern SymbolTable *symbolTable;
 CodeGenerator::CodeGenerator()
 {
     this->outputFile.open("output.asm");
-    this->output.precision(2);
 }
 
 CodeGenerator::~CodeGenerator()
@@ -135,6 +134,35 @@ void CodeGenerator::generateIncSPStatement()
         this->output << "\tincsp.i #" << this->numberOfPushes * 4 << endl;
         this->numberOfPushes = 0;
     }
+}
+
+void CodeGenerator::generateJumpLessStatement(Symbol left, Symbol right, Symbol label)
+{
+    if (left.getVarType() == right.getVarType())
+    {
+        if (left.getVarType() == INT_TYPE)
+        {
+            this->output << "\tjl.i " << left.getASMOperand() << ","
+                         << right.getASMOperand() << ",#" << label.getSymbolName()
+                         << endl;
+        }
+    }
+}
+
+void CodeGenerator::generateJumpEqualStatement(Symbol left, Symbol right, Symbol label)
+{
+    this->output << "\tje.i " << left.getASMOperand() << ","
+                 << right.getASMOperand() << ",#" << label.getSymbolName()
+                 << endl;
+}
+
+
+void CodeGenerator::generateAndStatement(Symbol left, Symbol right, Symbol to)
+{
+    this->output << "\tand.i " << left.getASMOperand() << ","
+                 << right.getASMOperand() << ","
+                 << to.getASMOperand()
+                 << endl;
 }
 
 CodeGenerator *codeGenerator = new CodeGenerator();
