@@ -41,6 +41,7 @@ public:
     void generateIncSPStatement();
     int getNumberOfPushes() {return this->numberOfPushes;}
     void generateJumpLessStatement(Symbol left, Symbol right, Symbol label);
+    void generateJumpGreaterStatement(Symbol left, Symbol right, Symbol label);
     void generateJumpEqualStatement(Symbol left, Symbol right, Symbol label);
     void generateAndStatement(Symbol left, Symbol right, Symbol to);
     void generateOrStatement(Symbol left, Symbol right, Symbol to);

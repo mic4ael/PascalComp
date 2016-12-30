@@ -173,4 +173,11 @@ void CodeGenerator::generateOrStatement(Symbol left, Symbol right, Symbol to)
                  << endl;
 }
 
+void CodeGenerator::generateJumpGreaterStatement(Symbol left, Symbol right, Symbol label)
+{
+    this->output << "\tjg.i " << left.getASMOperand() << ","
+                 << right.getASMOperand() << ",#" << label.getSymbolName()
+                 << endl;
+}
+
 CodeGenerator *codeGenerator = new CodeGenerator();
