@@ -123,6 +123,7 @@ declarations:
         for (int i = 0; i < pendingSymbols.size(); ++i) {
             if ($5 == ARRAY_INT_TOKEN || $5 == ARRAY_REAL_TOKEN)
                 continue;
+
             Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
             symbol.setSymbolType(VAR_SYMBOL);
             switch ($5) {
@@ -138,7 +139,7 @@ declarations:
             {
                 symbol.setIsLocal(true);
                 symbol.setAddress(symbolTable->localSpaceAddress);
-                symbolTable->localSpaceAddress -= symbol.getVarType() == INT_TYPE ? 4 : 8;
+                symbolTable->localSpaceAddress -= (symbol.getVarType() == INT_TYPE ? 4 : 8);
                 symbolTable->enterArg += (symbol.getVarType() == INT_TYPE ? 4 : 8);
             } else {
                 symbol.setAddress(symbolTable->getAddress());
@@ -181,7 +182,7 @@ type:
                 pendingSymbol.setIsLocal(true);
                 pendingSymbol.setIsReference(true);
                 pendingSymbol.setAddress(symbolTable->localSpaceAddress);
-                symbolTable->localSpaceAddress -= upperIndexValue * (type == INT_TYPE ? 4 : 8);
+                //symbolTable->localSpaceAddress -= upperIndexValue * (type == INT_TYPE ? 4 : 8);
             } else {
                 pendingSymbol.setAddress(symbolTable->getAddress());
                 symbolTable->increaseAddress(upperIndexValue * (type == INT_TYPE ? 4 : 8));
@@ -355,10 +356,10 @@ statement:
                 codeGenerator->generateIntToRealStatement(dst, tmpSymbol);
                 codeGenerator->generateMovStatement(src, tmpSymbol, REAL_TYPE);
             } else if (dst.getVarType() == REAL_TYPE && src.getVarType() == INT_TYPE) {
-                int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+                int tmpValue = symbolTable->createTemporaryVariable(INT_TYPE);
                 Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpValue);
-                codeGenerator->generateIntToRealStatement(src, tmpSymbol);
-                codeGenerator->generateMovStatement(tmpSymbol, src, REAL_TYPE);
+                codeGenerator->generateRealToIntStatement(dst, tmpSymbol);
+                codeGenerator->generateMovStatement(src, tmpSymbol, INT_TYPE);
             } else {
                 VarType varType = src.getVarType();
                 if (dst.getSymbolType() == CONSTANT_SYMBOL)
@@ -382,32 +383,42 @@ statement:
     }
     | procedure_statement
     | compound_statement
-    | IF expression THEN {
+    | IF expression {
+        $$ = symbolTable->createLabel(false);
+    } THEN {
         Symbol zeroConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(0));
         Symbol expression = symbolTable->getSymbolByIndex($2);
-        Symbol label = symbolTable->getSymbolByIndex(symbolTable->createLabel(true));
-        
-        symbolTable->createLabel(true);
+        Symbol label = symbolTable->getSymbolByIndex($3);;
+
         codeGenerator->generateJumpEqualStatement(expression, zeroConstant, label);
+
+        $$ = symbolTable->createLabel(false);
     } statement {
-        codeGenerator->generateJumpStatement(symbolTable->getLastPendingLabel());
-        codeGenerator->generateLabelStatement(symbolTable->getNextLabel());
-    } ELSE statement {
-        codeGenerator->generateLabelStatement(symbolTable->getNextLabel());
+        Symbol label = symbolTable->getSymbolByIndex($5);
+        codeGenerator->generateJumpStatement(label.getSymbolName());
+    } ELSE {
+        Symbol label = symbolTable->getSymbolByIndex($3);
+        codeGenerator->generateLabelStatement(label.getSymbolName());
+    } statement {
+        Symbol label = symbolTable->getSymbolByIndex($5);
+        codeGenerator->generateLabelStatement(label.getSymbolName());
     }
-    | WHILE {
+    | {
         int labelId = symbolTable->createLabel(false);
-        codeGenerator->generateLabelStatement(symbolTable->getSymbolByIndex(labelId).getSymbolName());
-        symbolTable->createLabel(true);
         $$ = labelId;
-    } expression {
+    } WHILE {
+        $$ = symbolTable->createLabel(false);
+        codeGenerator->generateLabelStatement(symbolTable->getSymbolByIndex($$).getSymbolName());
+    } expression DO {
         Symbol trueConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(0));
-        Symbol expression = symbolTable->getSymbolByIndex($3);
-        codeGenerator->generateJumpEqualStatement(expression, trueConstant, symbolTable->getNextLabel(false));
-    } DO statement {
-        Symbol beginLabel = symbolTable->getSymbolByIndex($2);
-        codeGenerator->generateJumpStatement(beginLabel.getSymbolName());
-        codeGenerator->generateLabelStatement(symbolTable->getNextLabel());
+        Symbol expression = symbolTable->getSymbolByIndex($4);
+        Symbol beginLabel = symbolTable->getSymbolByIndex($1);
+        codeGenerator->generateJumpEqualStatement(expression, trueConstant, beginLabel.getSymbolName());
+    } statement {
+        Symbol beginLabel = symbolTable->getSymbolByIndex($1);
+        Symbol elseLabel = symbolTable->getSymbolByIndex($3);
+        codeGenerator->generateJumpStatement(elseLabel.getSymbolName());
+        codeGenerator->generateLabelStatement(beginLabel.getSymbolName());
     }
     | /* ignore */
     ;
@@ -423,20 +434,18 @@ variable:
         Symbol arrayElementSizeConstant;
         int arrayElementSymbolIndex = symbolTable->createTemporaryVariable(INT_TYPE);
         Symbol &arrayElementSymbol = symbolTable->getSymbolByIndex(arrayElementSymbolIndex);
-        Symbol elementOffset;
+        arrayElementSymbol.setVarType(arraySymbol.getVarType() == ARRAY_INT_TYPE ? INT_TYPE : REAL_TYPE);
+        Symbol elementOffset = arraySymbol;
 
         if (arraySymbol.getVarType() == ARRAY_INT_TYPE)
         {
             arrayElementSizeConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(4));
-            elementOffset = arraySymbol;
         }
         else
         {
             arrayElementSizeConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(8));
-            elementOffset = arraySymbol;
         }
 
-        indexSymbol.setSymbolType(CONSTANT_SYMBOL);
         codeGenerator->generateArithmeticStatement(indexSymbol, oneConstantSymbol, tempSymbol, '-');
         codeGenerator->generateArithmeticStatement(tempSymbol, arrayElementSizeConstant, tempSymbol, '*');
         codeGenerator->generateArithmeticStatement(elementOffset, tempSymbol, arrayElementSymbol, '+');
@@ -822,8 +831,20 @@ factor:
         symbolTable->localSpaceAddress -= 4;
         $$ = refId;
     }
-    | INTEGER
-    | REAL
+    | INTEGER {
+        Symbol &symbol = symbolTable->getSymbolByIndex($1);
+        if (symbolTable->getName().compare("global") == 0)
+            symbol.setIsLocal(false);
+        else
+            symbol.setIsLocal(true);
+    }
+    | REAL {
+        Symbol &symbol = symbolTable->getSymbolByIndex($1);
+        if (symbolTable->getName().compare("global") == 0)
+            symbol.setIsLocal(false);
+        else
+            symbol.setIsLocal(true);
+    }
     | '(' expression ')' {
         $$ = $2;
     }

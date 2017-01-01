@@ -15,6 +15,7 @@ SymbolTable::SymbolTable()
     this->name = "global";
     this->localSpaceAddress = 0;
     this->lastLocalSpaceAddress = 0;
+    this->enterArg = 0;
     this->temporaryVariableCount = 0;
 
     Symbol *readProc = new Symbol("read");
@@ -46,13 +47,16 @@ int SymbolTable::lookupSymbol(const char *symbol)
 {
     if (this->symbols->size() == 0)
     {
-        return -3;
+        return -1;
     }
 
     for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols->at(i)->getSymbolName().compare(symbol) == 0)
+        Symbol *s = this->symbols->at(i);
+        if (s->getSymbolName().compare(symbol) == 0)
         {
+            if (this->name.compare("global") != 0 && !s->isLocalVar())
+                continue;
             return i;
         }
     }
@@ -74,7 +78,7 @@ int SymbolTable::lookupSymbol(int intValue)
             continue;
         if (s->getVarType() == INT_TYPE && s->getSymbolValue().intValue == intValue)
         {
-            if (!s->isLocalVar())
+            if (this->name.compare("global") != 0 && !s->isLocalVar())
                 continue;
             return i;
         }
@@ -97,7 +101,7 @@ int SymbolTable::lookupSymbol(double doubleValue)
             continue;
         if (s->getVarType() == REAL_TYPE && s->getSymbolValue().doubleValue == doubleValue)
         {
-            if (!s->isLocalVar())
+            if (this->name.compare("global") != 0 && !s->isLocalVar())
                 continue;
             return i;
         }
@@ -144,13 +148,20 @@ int SymbolTable::insertSymbol(const char *symbol)
 {
     for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols->at(i)->getSymbolName().compare(symbol) == 0)
+        Symbol *s = this->symbols->at(i);
+        if (s->getSymbolName().compare(symbol) == 0)
         {
+            if (this->name.compare("global") != 0 && !s->isLocalVar())
+                continue;
             return i;
         }
     }
 
     Symbol *s = new Symbol(symbol);
+    if (this->name.compare("global") != 0)
+    {
+        s->setIsLocal(true);
+    }
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
 }
@@ -167,6 +178,11 @@ int SymbolTable::insertArray(VarType arrayType)
         s->setVarType(ARRAY_REAL_TYPE);
     }
 
+    if (this->name.compare("global") != 0)
+    {
+        s->setIsLocal(true);
+    }
+
     s->setAddress(this->address);
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
@@ -176,14 +192,21 @@ int SymbolTable::insertSymbol(const char *symbol, VarType varType)
 {
     for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols->at(i)->getSymbolName().compare(symbol) == 0)
+        Symbol *s = this->symbols->at(i);
+        if (s->getSymbolName().compare(symbol) == 0)
         {
+            if (this->name.compare("global") != 0 && !s->isLocalVar())
+                continue;
             return i;
         }
     }
 
     Symbol *s = new Symbol(symbol, varType);
     s->setAddress(this->address);
+    if (this->name.compare("global") != 0)
+    {
+        s->setIsLocal(true);
+    }
     this->symbols->push_back(s);
     this->address += varType == INT_TYPE ? 4 : 8;
     return this->symbols->size() - 1;
@@ -196,6 +219,8 @@ int SymbolTable::insertConstant(int intValue)
         Symbol symbol = *this->symbols->at(i);
         if (symbol.getVarType() == INT_TYPE && symbol.getSymbolType() == CONSTANT_SYMBOL && symbol.getSymbolValue().intValue == intValue)
         {
+            if (this->name.compare("global") != 0 && !symbol.isLocalVar())
+                continue;
             return i;
         }
     }
@@ -263,7 +288,8 @@ string SymbolTable::printTable(SymbolTable *table)
                 << endl;
             break;
         case LABEL_SYMBOL:
-            out << "; " << index++ << " Global label " << symbol->getSymbolName() << endl;
+            out << "; " << index++ << (symbol->isLocalVar() ? " Local " : " Global ")
+                << "label " << symbol->getSymbolName() << endl;
             break;
         case VAR_SYMBOL:
         case ARGUMENT_SYMBOL:
@@ -361,7 +387,10 @@ SymbolTable *SymbolTable::addNewSymbolTable(string name)
 
     for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols->at(i)->getSymbolType() == ARGUMENT_SYMBOL)
+        Symbol *s = this->symbols->at(i);
+        if (s->getSymbolType() == ARGUMENT_SYMBOL)
+            continue;
+        if (s->getSymbolType() == VAR_SYMBOL && s->isLocalVar())
             continue;
         newTable->symbols->push_back(this->symbols->at(i));
     }
@@ -405,8 +434,16 @@ int SymbolTable::createReference(string name, VarType type)
 
 int SymbolTable::createLabel(bool pending)
 {
-    string labelName("lab" + std::to_string(this->nextLabelId++));
+    string labelName;
+    if (this->name.compare("global") == 0)
+        labelName = "lab" + std::to_string(this->nextLabelId++);
+    else
+        labelName = "lab" + std::to_string(this->parent->nextLabelId++);
     Symbol *s = new Symbol(labelName);
+    if (this->name.compare("global") == 0)
+        s->setIsLocal(false);
+    else
+        s->setIsLocal(true);
     s->setSymbolType(LABEL_SYMBOL);
     if (pending)
     {

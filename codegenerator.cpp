@@ -54,7 +54,7 @@ void CodeGenerator::generateWriteStatement(Symbol symbol)
 
 void CodeGenerator::generateReadStatement(Symbol symbol)
 {
-    this->output << "\tread.i" << symbol.getASMOperand() << endl;
+    this->output << "\tread.i " << symbol.getASMOperand() << endl;
 }
 
 void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbol dst, char op)
@@ -103,7 +103,7 @@ void CodeGenerator::generateIntToRealStatement(Symbol src, Symbol dst)
 
 void CodeGenerator::generateRealToIntStatement(Symbol src, Symbol dst)
 {
-    this->output << "\trealtoint.r " << src.getAddress() << "," << dst.getAddress()
+    this->output << "\trealtoint.r " << src.getASMOperand() << "," << dst.getASMOperand()
                  << endl;
 }
 
