@@ -33,7 +33,10 @@ void CodeGenerator::generateMovStatement(Symbol src, Symbol dst, VarType varType
 {
     char opType = varType == INT_TYPE ? 'i' : 'r';
     this->output << "\tmov." << opType << " " << dst.getASMOperand();
-    this->output << "," << src.getASMOperand();
+    this->output << ",";
+    if (src.getVarType() == ARRAY_INT_TYPE || src.getVarType() == ARRAY_REAL_TYPE)
+        this->output << "*";
+    this->output << src.getASMOperand();
     this->output << endl;
 }
 
@@ -56,7 +59,7 @@ void CodeGenerator::generateReadStatement(Symbol symbol)
 
 void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbol dst, char op)
 {
-    char operationType = left.getVarType() == INT_TYPE ? 'i' : 'r';
+    char operationType = left.getVarType() == INT_TYPE || left.getVarType() == ARRAY_INT_TYPE ? 'i' : 'r';
     switch (op)
     {
     case '+':
@@ -69,7 +72,7 @@ void CodeGenerator::generateArithmeticStatement(Symbol left, Symbol right, Symbo
         break;
     case '-':
         this->output << "\tsub." << operationType << " " << left.getASMOperand() << ","
-                         << right.getASMOperand() << "," << dst.getASMOperand() << endl;
+                     << right.getASMOperand() << "," << dst.getASMOperand() << endl;
         break;
     case '/':
         this->output << "\tdiv." << operationType << " " << left.getASMOperand() << ","
@@ -140,7 +143,10 @@ void CodeGenerator::generateCallStatement(string procedureName)
 void CodeGenerator::generatePushStatement(Symbol symbol)
 {
     this->numberOfPushes += 1;
-    this->output << "\tpush.i #" << symbol.getAddress();
+    this->output << "\tpush.i ";
+    if (symbol.getSymbolType() != ARGUMENT_SYMBOL && symbol.getVarType() != ARRAY_INT_TYPE && symbol.getVarType() != ARRAY_REAL_TYPE)
+        this->output << "#";
+    this->output << symbol.getASMOperand();
     this->output << endl;
 }
 

@@ -31,7 +31,7 @@ ID {LETTER}({LETTER}|{DIGIT})*
 {NEWLINE} |
 "{"[^{]*"}" /* ignore */;
 
-[\(\):;,\.\[\]] return yytext[0];
+[\(\):;,\[\]] return yytext[0];
 
 "program" return PROGRAM;
 "var" return VAR;
@@ -54,6 +54,7 @@ ID {LETTER}({LETTER}|{DIGIT})*
 "or" return OR;
 "not" return NOT;
 ".." return DOTDOT;
+"." return DOT;
 "+" return PLUS;
 "-" return MINUS;
 "/" return DIVISION;
@@ -67,10 +68,24 @@ ID {LETTER}({LETTER}|{DIGIT})*
 ":=" return ASSIGN;
 
 {INTEGER} {
+    int symbolIndex = symbolTable->lookupSymbol(atoi(yytext));
+    if (symbolIndex == -1)
+    {
+        yylval = symbolTable->insertConstant(atoi(yytext));
+    } else {
+        yylval = symbolIndex;
+    }
     return INTEGER;
 }
 
 {REAL} {
+    int symbolIndex = symbolTable->lookupSymbol((double) atof(yytext));
+    if (symbolIndex == -1)
+    {
+        yylval = symbolTable->insertDoubleConstant((double) atof(yytext));
+    } else {
+        yylval = symbolIndex;
+    }
     return REAL;
 }
 

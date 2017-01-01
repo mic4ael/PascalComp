@@ -69,10 +69,13 @@ int SymbolTable::lookupSymbol(int intValue)
 
     for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols->at(i)->getSymbolType() != CONSTANT_SYMBOL)
+        Symbol *s = this->symbols->at(i);
+        if (s->getSymbolType() != CONSTANT_SYMBOL)
             continue;
-        if (this->symbols->at(i)->getVarType() == INT_TYPE && this->symbols->at(i)->getSymbolValue().intValue == intValue)
+        if (s->getVarType() == INT_TYPE && s->getSymbolValue().intValue == intValue)
         {
+            if (!s->isLocalVar())
+                continue;
             return i;
         }
     }
@@ -89,10 +92,13 @@ int SymbolTable::lookupSymbol(double doubleValue)
 
     for (int i = 0; i < this->symbols->size(); ++i)
     {
-        if (this->symbols->at(i)->getSymbolType() != CONSTANT_SYMBOL)
+        Symbol *s = this->symbols->at(i);
+        if (s->getSymbolType() != CONSTANT_SYMBOL || s->isLocalVar())
             continue;
-        if (this->symbols->at(i)->getVarType() == REAL_TYPE && this->symbols->at(i)->getSymbolValue().doubleValue == doubleValue)
+        if (s->getVarType() == REAL_TYPE && s->getSymbolValue().doubleValue == doubleValue)
         {
+            if (!s->isLocalVar())
+                continue;
             return i;
         }
     }
@@ -122,6 +128,7 @@ int SymbolTable::createTemporaryVariable(VarType varType)
     else
     {
         s->setAddress(this->address);
+        s->setIsLocal(false);
         this->address += varType == INT_TYPE ? 4 : 8;
     }
 
@@ -144,6 +151,23 @@ int SymbolTable::insertSymbol(const char *symbol)
     }
 
     Symbol *s = new Symbol(symbol);
+    this->symbols->push_back(s);
+    return this->symbols->size() - 1;
+}
+
+int SymbolTable::insertArray(VarType arrayType)
+{
+    Symbol *s = new Symbol();
+    if (arrayType == INT_TYPE)
+    {
+        s->setVarType(ARRAY_INT_TYPE);
+    }
+    else
+    {
+        s->setVarType(ARRAY_REAL_TYPE);
+    }
+
+    s->setAddress(this->address);
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
 }
@@ -178,11 +202,10 @@ int SymbolTable::insertConstant(int intValue)
 
     Symbol *s = new Symbol(intValue);
     s->setAddress(this->address);
-    // if (this->name.compare("global") != 0)
-    // {
-    //     this->lastLocalSpaceAddress = this->localSpaceAddress;
-    //     this->localSpaceAddress -= 4;
-    // }
+    if (this->name.compare("global") != 0)
+    {
+        s->setIsLocal(true);
+    }
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
 }
@@ -200,11 +223,10 @@ int SymbolTable::insertDoubleConstant(double doubleValue)
 
     Symbol *s = new Symbol(doubleValue);
     s->setAddress(this->address);
-    // if (this->name.compare("global") != 0)
-    // {
-    //     this->lastLocalSpaceAddress = this->localSpaceAddress;
-    //     this->localSpaceAddress -= 8;
-    // }
+    if (this->name.compare("global") != 0)
+    {
+        s->setIsLocal(true);
+    }
     this->symbols->push_back(s);
     return this->symbols->size() - 1;
 }
@@ -249,7 +271,11 @@ string SymbolTable::printTable(SymbolTable *table)
 
             if (symbol->isSymbolReference())
             {
-                out << " Local reference variable " << symbol->getSymbolName();
+                if (table->getName().compare("global") != 0)
+                    out << " Local reference variable ";
+                else
+                    out << " Global reference variable ";
+                out << symbol->getSymbolName();
             }
             else
             {
@@ -271,6 +297,16 @@ string SymbolTable::printTable(SymbolTable *table)
                     out << " real offset=" << symbol->getAddress() << endl;
                     address += 8;
                     break;
+                case ARRAY_INT_TYPE:
+                    out << " array [" << symbol->getLowerIndex() << ".." << symbol->getUpperIndex() << "]"
+                        << " of integer" << " offset="
+                        << symbol->getAddress() << endl;
+                    break;
+                case ARRAY_REAL_TYPE:
+                    out << " array [" << symbol->getLowerIndex() << ".." << symbol->getUpperIndex() << "]"
+                        << " of real" << " offset="
+                        << symbol->getAddress() << endl;
+                    break;
                 case NONE_TYPE:
                     out << endl;
                     break;
@@ -278,7 +314,7 @@ string SymbolTable::printTable(SymbolTable *table)
                 break;
         case CONSTANT_SYMBOL:
             out << "; " << index++;
-            if (table->getName().compare("global") == 0)
+            if (!symbol->isLocalVar())
             {
                 out << " Global number ";
             }
@@ -325,6 +361,8 @@ SymbolTable *SymbolTable::addNewSymbolTable(string name)
 
     for (int i = 0; i < this->symbols->size(); ++i)
     {
+        if (this->symbols->at(i)->getSymbolType() == ARGUMENT_SYMBOL)
+            continue;
         newTable->symbols->push_back(this->symbols->at(i));
     }
 
@@ -352,6 +390,10 @@ int SymbolTable::lookupReturnVariable(Symbol funcSymbol)
 int SymbolTable::createReference(string name, VarType type)
 {
     Symbol *s = new Symbol(name);
+    if (this->name.compare("global") != 0)
+    {
+        s->setIsLocal(true);
+    }
     s->setVarType(type);
     s->setSymbolType(VAR_SYMBOL);
     s->setIsReference(true);

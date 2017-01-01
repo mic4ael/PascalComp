@@ -13,11 +13,11 @@ class SymbolTable
 private:
     string name;
     int address;
-    SymbolTable *parent;
     string printTable(SymbolTable *table);
     int nextLabelId;
 
 public:
+    SymbolTable *parent;
     int enterArg;
     int temporaryVariableCount;
     vector<Symbol *> *symbols;
@@ -34,6 +34,7 @@ public:
     Symbol &getSymbolByIndex(int tokenIndex);
     int insertSymbol(const char *symbol);
     int insertSymbol(const char *symbol, VarType varType);
+    int insertArray(VarType arrayType);
     int insertConstant(int intValue);
     int insertDoubleConstant(double doubleValue);
     string tableStr();

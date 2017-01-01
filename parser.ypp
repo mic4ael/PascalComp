@@ -24,13 +24,15 @@ std::map<int, VarType> varToTypesMap;
 int programSymbolIndex = -1;
 SymbolTable *tmp;
 std::vector<Symbol> searchFuncArguments(int funcId);
-int funcCall = -1;
+std::vector<Symbol> searchProcArguments(int funcId);
 
 %}
 
 %token PROGRAM
 %token VAR
 %token ARRAY
+%token ARRAY_INT_TOKEN
+%token ARRAY_REAL_TOKEN
 %token OF
 %token INTEGER_TYPE_TOKEN
 %token INTEGER
@@ -47,6 +49,7 @@ int funcCall = -1;
 %token DO
 %token OR
 %token NOT
+%token DOT
 %token DOTDOT
 %token PLUS
 %token MINUS
@@ -93,7 +96,7 @@ program_compound_statement:
         codeGenerator->generateLabelStatement(programLabel);
     }
     statement_list
-    END_TOKEN '.' {
+    END_TOKEN DOT {
         codeGenerator->generateExitStatement();
     }
     ;
@@ -118,6 +121,8 @@ identifier_list:
 declarations:
     declarations VAR identifier_list ':' type ';' {
         for (int i = 0; i < pendingSymbols.size(); ++i) {
+            if ($5 == ARRAY_INT_TOKEN || $5 == ARRAY_REAL_TOKEN)
+                continue;
             Symbol &symbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
             symbol.setSymbolType(VAR_SYMBOL);
             switch ($5) {
@@ -128,6 +133,7 @@ declarations:
                     symbol.setVarType(REAL_TYPE);
                     break;
             }
+
             if (symbolTable->getName().compare("global") != 0)
             {
                 symbol.setIsLocal(true);
@@ -140,6 +146,7 @@ declarations:
                 symbolTable->enterArg += (symbol.getVarType() == INT_TYPE ? 4 : 8);
             }
         }
+
         pendingSymbols.clear();
     }
     | /* empty */
@@ -147,7 +154,45 @@ declarations:
 
 type:
     standard_type
-    | ARRAY '[' INTEGER DOTDOT INTEGER ']' OF standard_type
+    | ARRAY '[' INTEGER DOTDOT INTEGER ']' OF standard_type {
+        Symbol lowerIndexSymbol = symbolTable->getSymbolByIndex($3);
+        Symbol upperIndexSymbol = symbolTable->getSymbolByIndex($5);
+        int lowerIndexValue = lowerIndexSymbol.getSymbolValue().intValue;
+        int upperIndexValue = upperIndexSymbol.getSymbolValue().intValue;
+        VarType type = $8 == INTEGER_TYPE_TOKEN ? INT_TYPE : REAL_TYPE;
+
+        if (upperIndexValue < lowerIndexValue)
+        {
+            cout << "Błąd definicji tablicy." << endl
+                 << "Gorny indeks nie moze byc mniejszy od dolnego indeksu"
+                 << endl;
+            exit(-1);
+        }
+
+        for (int i = 0; i < pendingSymbols.size(); ++i) {
+            Symbol &pendingSymbol = symbolTable->getSymbolByIndex(pendingSymbols[i]);
+            pendingSymbol.setSymbolType(VAR_SYMBOL);
+            pendingSymbol.setVarType(type == INT_TYPE ? ARRAY_INT_TYPE : ARRAY_REAL_TYPE);
+            pendingSymbol.setLowerIndex(lowerIndexValue);
+            pendingSymbol.setUpperIndex(upperIndexValue);
+
+            if (symbolTable->getName().compare("global") != 0)
+            {
+                pendingSymbol.setIsLocal(true);
+                pendingSymbol.setIsReference(true);
+                pendingSymbol.setAddress(symbolTable->localSpaceAddress);
+                symbolTable->localSpaceAddress -= upperIndexValue * (type == INT_TYPE ? 4 : 8);
+            } else {
+                pendingSymbol.setAddress(symbolTable->getAddress());
+                symbolTable->increaseAddress(upperIndexValue * (type == INT_TYPE ? 4 : 8));
+            }
+        }
+
+        if (type == INT_TYPE)
+            $$ = ARRAY_INT_TOKEN;
+        else
+            $$ = ARRAY_REAL_TOKEN;
+    }
     ;
 
 standard_type:
@@ -198,6 +243,7 @@ subprogram_head:
         for (iter = varToTypesMap.rbegin(); iter != varToTypesMap.rend(); ++iter) {
             Symbol &symbol = symbolTable->getSymbolByIndex(iter->first);
             symbol.setVarType(iter->second);
+            symbol.setIsLocal(true);
             symbol.setSymbolType(ARGUMENT_SYMBOL);
             symbol.setIsReference(true);
             symbol.setAddress(symbolTable->getAddress());
@@ -213,6 +259,17 @@ subprogram_head:
         symbolTable = symbolTable->addNewSymbolTable(symbol.getSymbolName());
     } arguments ';' {
         Symbol &symbol = symbolTable->getSymbolByIndex($2);
+
+        std::map<int, VarType>::reverse_iterator iter;
+        for (iter = varToTypesMap.rbegin(); iter != varToTypesMap.rend(); ++iter) {
+            Symbol &symbol = symbolTable->getSymbolByIndex(iter->first);
+            symbol.setVarType(iter->second);
+            symbol.setSymbolType(ARGUMENT_SYMBOL);
+            symbol.setIsReference(true);
+            symbol.setAddress(symbolTable->getAddress());
+            symbolTable->increaseAddress(4);
+        }
+
         codeGenerator->generateLabelStatement(symbol.getSymbolName());
         codeGenerator->generateEnterPlaceholder(symbol.getSymbolName());
     }
@@ -231,12 +288,20 @@ parameter_list:
             {
                 varToTypesMap[pendingSymbols[i]] = INT_TYPE;
             }
-            else
+            else if ($3 == REAL_TYPE_TOKEN)
             {
                 varToTypesMap[pendingSymbols[i]] = REAL_TYPE;
             }
-            
+            else if ($3 == ARRAY_INT_TOKEN)
+            {
+                varToTypesMap[pendingSymbols[i]] = ARRAY_INT_TYPE;
+            }
+            else if ($3 == ARRAY_REAL_TOKEN)
+            {
+                varToTypesMap[pendingSymbols[i]] = ARRAY_REAL_TYPE;
+            }
         }
+
         pendingSymbols.clear();
     }
     | parameter_list ';' identifier_list ':' type {
@@ -246,12 +311,20 @@ parameter_list:
             {
                 varToTypesMap[pendingSymbols[i]] = INT_TYPE;
             }
-            else
+            else if ($5 == REAL_TYPE_TOKEN)
             {
                 varToTypesMap[pendingSymbols[i]] = REAL_TYPE;
             }
-            
+            else if ($5 == ARRAY_INT_TOKEN)
+            {
+                varToTypesMap[pendingSymbols[i]] = ARRAY_INT_TYPE;
+            }
+            else if ($5 == ARRAY_REAL_TOKEN)
+            {
+                varToTypesMap[pendingSymbols[i]] = ARRAY_REAL_TYPE;
+            }
         }
+
         pendingSymbols.clear();
     }
     ;
@@ -341,7 +414,36 @@ statement:
 
 variable:
     ID
-    | ID '[' expression ']'
+    | ID '[' expression ']' {
+        Symbol arraySymbol = symbolTable->getSymbolByIndex($1);
+        Symbol indexSymbol = symbolTable->getSymbolByIndex($3);
+        Symbol oneConstantSymbol = symbolTable->getSymbolByIndex(symbolTable->insertConstant(1));
+        int tmpSymbolIndex = symbolTable->createTemporaryVariable(INT_TYPE);
+        Symbol tempSymbol = symbolTable->getSymbolByIndex(tmpSymbolIndex);
+        Symbol arrayElementSizeConstant;
+        int arrayElementSymbolIndex = symbolTable->createTemporaryVariable(INT_TYPE);
+        Symbol &arrayElementSymbol = symbolTable->getSymbolByIndex(arrayElementSymbolIndex);
+        Symbol elementOffset;
+
+        if (arraySymbol.getVarType() == ARRAY_INT_TYPE)
+        {
+            arrayElementSizeConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(4));
+            elementOffset = arraySymbol;
+        }
+        else
+        {
+            arrayElementSizeConstant = symbolTable->getSymbolByIndex(symbolTable->insertConstant(8));
+            elementOffset = arraySymbol;
+        }
+
+        indexSymbol.setSymbolType(CONSTANT_SYMBOL);
+        codeGenerator->generateArithmeticStatement(indexSymbol, oneConstantSymbol, tempSymbol, '-');
+        codeGenerator->generateArithmeticStatement(tempSymbol, arrayElementSizeConstant, tempSymbol, '*');
+        codeGenerator->generateArithmeticStatement(elementOffset, tempSymbol, arrayElementSymbol, '+');
+        arrayElementSymbol.setIsReference(true);
+
+        $$ = arrayElementSymbolIndex;
+    }
     ;
 
 procedure_statement:
@@ -364,8 +466,45 @@ procedure_statement:
                 codeGenerator->generateReadStatement(argSymbol);
             }
         } else {
+            std::vector<Symbol> procArgs = searchProcArguments($1);;
+            for (int i = 0; i < arguments.size(); ++i)
+            {
+                Symbol s = symbolTable->getSymbolByIndex(arguments[i]);
+                if (s.getSymbolType() == CONSTANT_SYMBOL)
+                {
+                    int tmpIndex = symbolTable->createTemporaryVariable(s.getVarType());
+                    Symbol tmpSymbol = symbolTable->getSymbolByIndex(tmpIndex);
+                    codeGenerator->generateMovStatement(tmpSymbol, s, s.getVarType());
+                    codeGenerator->generatePushStatement(tmpSymbol);
+                }
+                else if (s.getVarType() != procArgs[i].getVarType())
+                {
+                    if (s.getVarType() == INT_TYPE)
+                    {
+                        int tmpValue = symbolTable->createTemporaryVariable(REAL_TYPE);
+                        Symbol ss = symbolTable->getSymbolByIndex(tmpValue);
+                        codeGenerator->generateIntToRealStatement(s, ss);
+                        codeGenerator->generatePushStatement(ss);
+                    }
+                    else
+                    {
+                        int tmpValue = symbolTable->createTemporaryVariable(INT_TYPE);
+                        Symbol ss = symbolTable->getSymbolByIndex(tmpValue);
+                        codeGenerator->generateRealToIntStatement(s, ss);
+                        codeGenerator->generatePushStatement(ss);
+                    }
+                }
+                else
+                {
+                    codeGenerator->generatePushStatement(s);
+                }
+            }
+
             codeGenerator->generateCallStatement(procedureSymbol.getSymbolName());
+            codeGenerator->generateIncSPStatement();
+            symbolTable->localSpaceAddress -= 4;
         }
+
         arguments.clear();
     }
     ;
@@ -476,10 +615,13 @@ simple_expression:
             $$ = tmpIndex;
         }
 
-        if ('+' == yytext[0])
+        if ($2 == PLUS) {
             codeGenerator->generateArithmeticStatement(left, right, dst, '+');
+        }
         else
+        {
             codeGenerator->generateArithmeticStatement(left, right, dst, '-');
+        }
     }
     | simple_expression OR term {
         Symbol left = symbolTable->getSymbolByIndex($1);
@@ -635,9 +777,7 @@ factor:
             $$ = $1;
         }
     }
-    | ID {
-        funcCall = $1;
-    } '(' expression_list ')' {
+    | ID '(' expression_list ')' {
         std::vector<Symbol> funcArgs = searchFuncArguments($1);
         for (int i = 0; i < arguments.size(); ++i)
         {
@@ -673,7 +813,6 @@ factor:
         }
 
         arguments.clear();
-        funcCall = -1;
         Symbol symbol = symbolTable->getSymbolByIndex($1);
         int refId = symbolTable->lookupReturnVariable(symbol);
         Symbol returnVar = symbolTable->getSymbolByIndex(refId);
@@ -683,24 +822,8 @@ factor:
         symbolTable->localSpaceAddress -= 4;
         $$ = refId;
     }
-    | INTEGER {
-        int symbolIndex = symbolTable->lookupSymbol(atoi(yytext));
-        if (symbolIndex == -1)
-        {
-            $$ = symbolTable->insertConstant(atoi(yytext));
-        } else {
-            $$ = symbolIndex;
-        }
-    }
-    | REAL {
-        int symbolIndex = symbolTable->lookupSymbol((double) atof(yytext));
-        if (symbolIndex == -1)
-        {
-            $$ = symbolTable->insertDoubleConstant((double) atof(yytext));
-        } else {
-            $$ = symbolIndex;
-        }
-    }
+    | INTEGER
+    | REAL
     | '(' expression ')' {
         $$ = $2;
     }
@@ -726,8 +849,12 @@ factor:
     ;
 
 sign:
-    PLUS
-    | MINUS
+    PLUS {
+        $$ = PLUS;
+    }
+    | MINUS {
+        $$ = MINUS;
+    }
     ;
 %%
 
@@ -755,6 +882,35 @@ std::vector<Symbol> searchFuncArguments(int funcId)
                     {
                         ret.push_back(s);
                     }
+                }
+            }
+        }
+    }
+
+    return ret;
+}
+
+std::vector<Symbol> searchProcArguments(int procId)
+{
+    std::vector<Symbol> ret;
+    Symbol proc = symbolTable->getSymbolByIndex(procId);
+    SymbolTable *tmp = symbolTable;
+
+    if (symbolTable->getName().compare("global") != 0) {
+        tmp = symbolTable->parent;
+    }
+
+    for (int i = 0; i < tmp->children->size(); ++i)
+    {
+        SymbolTable *table = tmp->children->at(i);
+        if (table->getName().compare(proc.getSymbolName()) == 0)
+        {
+            for (int j = 0; j < table->symbols->size(); ++j)
+            {
+                Symbol s = *table->symbols->at(j);
+                if (s.getSymbolType() == ARGUMENT_SYMBOL)
+                {
+                    ret.push_back(s);
                 }
             }
         }
