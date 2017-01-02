@@ -126,24 +126,33 @@ public:
         this->isLocal = isLocal;
     }
 
-    std::string getASMOperand()
+    std::string getASMOperand(bool isPush = false)
     {
         if (this->isReference)
         {
             if (this->isLocalVar()) {
                 if (this->type != ARRAY_INT_TYPE && this->type != ARRAY_REAL_TYPE) {
+                    string ret = "*";
+                    if (isPush)
+                        ret = "";
+
                     if (this->address < 0)
-                        return "*BP" + std::to_string(this->address);
+                        return ret + "BP" + std::to_string(this->address);
                     else
-                        return "*BP+" + std::to_string(this->address);
+                        return ret + "BP+" + std::to_string(this->address);
                 }
-                if (this->address < 0)
-                    return "BP" + std::to_string(this->address);
                 else
-                    return "BP+" + std::to_string(this->address);
+                {
+                    if (this->address < 0)
+                        return "BP" + std::to_string(this->address);
+                    else
+                        return "BP+" + std::to_string(this->address);
+                }
             }
             else
+            {
                 return "*" + std::to_string(this->address);
+            }
         } else if (this->isLocalVar()) {
             if (this->symbolType == CONSTANT_SYMBOL) {
                 if (this->type == INT_TYPE)

@@ -547,6 +547,7 @@ expression:
         codeGenerator->generateMovStatement(tmpSymbol, trueConstant, INT_TYPE);
         codeGenerator->generateLabelStatement(falseLabel.getSymbolName());
 
+        $$ = resultId;
     }
     | simple_expression NOT_EQUAL simple_expression
     | simple_expression LESS simple_expression {
@@ -888,9 +889,9 @@ void yyerror(const char *err)
 std::vector<Symbol> searchFuncArguments(int funcId)
 {
     std::vector<Symbol> ret;
+    Symbol func = symbolTable->getSymbolByIndex(funcId);
     if (symbolTable->getName().compare("global") == 0)
     {
-        Symbol func = symbolTable->getSymbolByIndex(funcId);
         for (int i = 0; i < symbolTable->children->size(); ++i)
         {
             SymbolTable *table = symbolTable->children->at(i);
@@ -904,6 +905,16 @@ std::vector<Symbol> searchFuncArguments(int funcId)
                         ret.push_back(s);
                     }
                 }
+            }
+        }
+    } else if (func.getSymbolName().compare(symbolTable->getName()) == 0)
+    {
+        for (int j = 0; j < symbolTable->symbols->size(); ++j)
+        {
+            Symbol s = *symbolTable->symbols->at(j);
+            if (s.getSymbolType() == ARGUMENT_SYMBOL)
+            {
+                ret.push_back(s);
             }
         }
     }

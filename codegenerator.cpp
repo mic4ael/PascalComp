@@ -146,7 +146,7 @@ void CodeGenerator::generatePushStatement(Symbol symbol)
     this->output << "\tpush.i ";
     if (symbol.getSymbolType() != ARGUMENT_SYMBOL && symbol.getVarType() != ARRAY_INT_TYPE && symbol.getVarType() != ARRAY_REAL_TYPE)
         this->output << "#";
-    this->output << symbol.getASMOperand();
+    this->output << symbol.getASMOperand(true);
     this->output << endl;
 }
 
