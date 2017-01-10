@@ -15,7 +15,7 @@ parser.cpp parser.hpp: parser.ypp lexer.hpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	-rm -f *.o lexer.cpp parser.cpp parser.hpp tests/*.asm main
+	-rm -f *.o lexer.cpp lexer.hpp parser.cpp parser.hpp tests/*.asm main
 
 .PHONY:
 	clean
